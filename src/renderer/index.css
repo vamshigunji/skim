@@ -1,0 +1,26 @@
+@import 'tailwindcss';
+
+/* Tokyo Night tokens. Source: design/README.md. */
+@theme {
+  --color-bg: #1A1B26;
+  --color-panel: #202338;
+  --color-raised: #24283B;
+  --color-active: #2B3352;
+  --color-line: #353B59;
+  --color-text: #C0CAF5;
+  --color-text-2: #A9B1D6;
+  --color-muted: #7A82A8;
+  --color-accent: #7AA2F7;
+  --color-amber: #E0AF68;
+  --color-green: #9ECE6A;
+  --color-red: #F7768E;
+  --color-paper: #E8E7E3;
+  --color-paper-ink: #24283B;
+  --font-ui: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-reading: Newsreader, Georgia, serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
