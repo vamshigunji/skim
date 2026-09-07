@@ -1,14 +1,25 @@
 import { useEffect, useState } from 'react'
+import type { OpenedPdf } from '../preload/api'
 import { CommandPalette } from './CommandPalette'
 import { keys, smartViews, views, type ViewId } from './nav'
+import { Reader } from './reader/Reader'
 
 export function App() {
   const [view, setView] = useState<ViewId>('library')
   const [palette, setPalette] = useState<'commands' | 'help' | null>(null)
+  const [doc, setDoc] = useState<OpenedPdf | null>(null)
+
+  const open = (d: OpenedPdf | null) => {
+    if (!d) return
+    setDoc(d)
+    setView('reading')
+  }
 
   useEffect(() => {
+    window.skim?.onOpen(open)
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === 'k') setPalette('commands')
+      else if (e.metaKey && e.key === 'o') window.skim?.openDialog().then(open)
       else if (e.key === '?' && !(e.target instanceof HTMLInputElement)) setPalette('help')
       else return
       e.preventDefault()
@@ -52,11 +63,18 @@ export function App() {
           </span>
         </nav>
 
-        <main className="relative flex-1 p-8">
-          <h1 className="font-reading text-[28px] font-semibold">{active.label}</h1>
-          <p className="absolute bottom-6 left-8 text-[10px] text-text-2">
-            {Object.values(keys).map((k) => `${k.combo} ${k.label}`).join('     ')}
-          </p>
+        <main className="relative min-w-0 flex-1">
+          {view === 'reading' && doc ? (
+            <Reader key={doc.path} path={doc.path} data={doc.data} />
+          ) : (
+            <div className="p-8">
+              <h1 className="font-reading text-[28px] font-semibold">{active.label}</h1>
+              {view === 'reading' && <p className="mt-2 text-sm text-text-2">No paper open. Press {keys.open.combo} to open a PDF.</p>}
+              <p className="absolute bottom-6 left-8 text-[10px] text-text-2">
+                {Object.values(keys).map((k) => `${k.combo} ${k.label}`).join('     ')}
+              </p>
+            </div>
+          )}
         </main>
       </div>
 

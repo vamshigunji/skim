@@ -1,0 +1,66 @@
+%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /Outlines 7 0 R /PageLabels << /Nums [0 << /S /r >> 1 << /S /D /St 1173 >>] >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 8 0 R /Resources << /Font << /F1 6 0 R >> >> >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 9 0 R /Resources << /Font << /F1 6 0 R >> >> >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 10 0 R /Resources << /Font << /F1 6 0 R >> >> >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+7 0 obj
+<< /Type /Outlines /First 11 0 R /Last 12 0 R /Count 2 >>
+endobj
+8 0 obj
+<< /Length 43 >>
+stream
+BT /F1 24 Tf 72 700 Td (Front matter) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Length 59 >>
+stream
+BT /F1 24 Tf 72 700 Td (Scaled dot-product attention) Tj ET
+endstream
+endobj
+10 0 obj
+<< /Length 51 >>
+stream
+BT /F1 24 Tf 72 700 Td (Multi-head attention) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Title (Abstract) /Parent 7 0 R /Next 12 0 R /Dest [4 0 R /XYZ 0 792 0] >>
+endobj
+12 0 obj
+<< /Title (Introduction) /Parent 7 0 R /Prev 11 0 R /Dest [5 0 R /XYZ 0 792 0] >>
+endobj
+xref
+0 13
+0000000000 65535 f 
+0000000009 00000 n 
+0000000137 00000 n 
+0000000206 00000 n 
+0000000332 00000 n 
+0000000458 00000 n 
+0000000585 00000 n 
+0000000655 00000 n 
+0000000728 00000 n 
+0000000821 00000 n 
+0000000930 00000 n 
+0000001032 00000 n 
+0000001126 00000 n 
+trailer
+<< /Size 13 /Root 1 0 R >>
+startxref
+1224
+%%EOF

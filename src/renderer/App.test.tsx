@@ -78,7 +78,7 @@ describe('command palette', () => {
     const input = palette()!.querySelector('input')!
     await key({ key: 'ArrowDown' }, input)
     await key({ key: 'Enter' }, input)
-    expect(current()).toContain('Reading queue')
+    expect(current()).toBe('Reading')
   })
 
   it('closes on Escape without changing the view', async () => {

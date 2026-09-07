@@ -1,8 +1,9 @@
-import { BookOpen, Library, Layers2, NotebookPen } from 'lucide-react'
+import { BookOpen, Library, Layers2, List, NotebookPen } from 'lucide-react'
 
 export const views = [
   { id: 'library', label: 'Library', icon: Library },
-  { id: 'queue', label: 'Reading queue', icon: BookOpen },
+  { id: 'reading', label: 'Reading', icon: BookOpen },
+  { id: 'queue', label: 'Reading queue', icon: List },
   { id: 'collections', label: 'Collections', icon: Layers2 },
   { id: 'notes', label: 'Notes', icon: NotebookPen },
 ] as const
@@ -15,6 +16,7 @@ export const smartViews = ['To read', 'Skimming', 'Cited']
 // Single source of truth for global keys. The hint line and the handler both read this.
 export const keys = {
   palette: { combo: '⌘K', label: 'commands' },
+  open: { combo: '⌘O', label: 'open PDF' },
   help: { combo: '?', label: 'shortcuts' },
   close: { combo: 'Esc', label: 'close' },
 }
