@@ -51,6 +51,8 @@ const api: SkimApi = {
     ask: (req, onDelta) => streamed('ai.ask', req, onDelta),
     askGrounded: (req, onDelta) => streamed('ai.askGrounded', req, onDelta),
     thread: (path) => ipcRenderer.invoke('ai.thread', path),
+    skim: (req) => ipcRenderer.invoke('ai.skim', req),
+    skimList: (path) => ipcRenderer.invoke('ai.skimList', path),
     cancel: (id) => ipcRenderer.invoke('ai.cancel', id),
     usage: () => ipcRenderer.invoke('ai.usage'),
   },

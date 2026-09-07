@@ -27,6 +27,8 @@ export function startFakeServer() {
         const answers: Record<string, string> = {
           'grounded-model': 'Attention comes from scaled dot products [[c:2 "Scaled dot-product attention"]]. It also claims [[c:2 "this quote does not exist"]].',
           'notfound-model': 'NOT_FOUND The passages do not mention a sample size.',
+          'skim-model':
+            'Here: [{"label":"method","quote":"Scaled dot-product attention","confidence":0.9},{"label":"result","quote":"Multi-head attention","confidence":0.8},{"label":"goal","quote":"a made up sentence","confidence":0.99}]',
         }
         const words = answers[body?.model] ? answers[body.model].match(/.{1,13}/g)! : ['Hello', ' from', ' fake']
         for (const w of words) await chunk(`data: ${JSON.stringify({ choices: [{ delta: { content: w } }] })}\n\n`)

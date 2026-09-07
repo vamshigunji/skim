@@ -20,7 +20,7 @@ const kinds = ['highlight', 'underline', 'strike'] as const
 
 export const isShown = (a: Annotation, f: Filter) => !f.kinds.includes(a.kind) && !f.colors.includes(a.color ?? '')
 
-const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v])
+export const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v])
 
 export function AnnotationsPanel({ annotations, palette, filter, selectedId, onFilter, onSelect, onComment }: Props) {
   const shown = annotations.filter((a) => isShown(a, filter))

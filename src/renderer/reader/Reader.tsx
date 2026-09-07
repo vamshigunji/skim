@@ -6,10 +6,11 @@ import type { Annotation } from '../../shared/types/db'
 import type { SearchHit, SearchOptions } from '../../shared/types/search'
 import type { ReferenceView, RegionView } from '../../shared/types/references'
 import type { AskMessage } from '../../shared/types/ai'
+import { DENSITY, pickOverlays, SKIM_LABELS, type SkimItem, type SkimLabel } from '../../shared/skim'
 import { AnnotationLayer } from './AnnotationLayer'
 import { HoverCard, type Target } from './HoverCard'
 import { markMentions } from './mentions'
-import { AnnotationsPanel, isShown, type Filter } from './AnnotationsPanel'
+import { AnnotationsPanel, isShown, toggle, type Filter } from './AnnotationsPanel'
 import { AskPanel } from './AskPanel'
 import { findQuoteRange } from './locate'
 import { createHistory } from './history'
@@ -32,6 +33,8 @@ const marks: [Mark, string][] = [
   ['strike', 'S'],
 ]
 const ZOOM_STEP = 1.25
+// One blue family for Skim overlays so they never read as user highlights (features/04 UX notes).
+const SKIM_COLORS: Record<SkimLabel, string> = { goal: '#7AA2F7', method: '#7DCFFF', result: '#2AC3DE', limitation: '#89DDFF' }
 
 export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
   const saved = loadPosition(path)
@@ -63,6 +66,12 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
   const [attached, setAttached] = useState<string | null>(null)
   const [flash, setFlash] = useState<{ page: number; rects: FracRect[] } | null>(null)
   const asking = useRef<string | null>(null)
+  const [skim, setSkim] = useState(false)
+  const [skimItems, setSkimItems] = useState<SkimItem[]>([])
+  const [skimRects, setSkimRects] = useState<Record<string, FracRect[]>>({})
+  const [skimNote, setSkimNote] = useState('')
+  const [density, setDensity] = useState(DENSITY.default)
+  const [hiddenLabels, setHiddenLabels] = useState<SkimLabel[]>([])
   const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const navStack = useRef<number[]>([])
   const findRef = useRef<HTMLInputElement>(null)
@@ -236,20 +245,50 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
         asking.current = null
       })
   }
+  // Page-fraction rects for a verified quote, located in the text layer. Null when the layer has not rendered or the quote is broken by hyphenation.
+  const locate = (i: number, quote: string) => {
+    const pageEl = pages.current[i]
+    const r = pageEl && findQuoteRange(pageEl.querySelectorAll('.textLayer > *'), quote)
+    if (!r) return null
+    const range = document.createRange()
+    range.setStart(r.start.node, r.start.offset)
+    range.setEnd(r.end.node, r.end.offset)
+    return toFractions([...range.getClientRects()], pageEl.getBoundingClientRect())
+  }
   // Land on the cited page and flash the verified quote for 3 seconds (features/04 requirement 3).
   const jumpQuote = (i: number, quote: string) => {
     go(i)
     setTimeout(() => {
-      const pageEl = pages.current[i]
-      const r = pageEl && findQuoteRange(pageEl.querySelectorAll('.textLayer > *'), quote)
-      if (!r) return
-      const range = document.createRange()
-      range.setStart(r.start.node, r.start.offset)
-      range.setEnd(r.end.node, r.end.offset)
-      setFlash({ page: i, rects: toFractions([...range.getClientRects()], pageEl.getBoundingClientRect()) })
+      const rects = locate(i, quote)
+      if (!rects) return
+      setFlash({ page: i, rects })
       setTimeout(() => setFlash(null), 3000)
     }, 50)
   }
+  // Skim mode: off by default, stored overlays first, otherwise one model call. Only verified sentences arrive (features/04 requirement 8).
+  const toggleSkim = () => {
+    if (skim) return setSkim(false)
+    setSkim(true)
+    setSkimNote('')
+    window.skim?.ai.skimList(path).then(async (stored) => {
+      if (stored.length) return setSkimItems(stored)
+      setSkimNote('Skimming…')
+      try {
+        const r = await window.skim!.ai.skim({ requestId: crypto.randomUUID(), path })
+        if ('needsConfirmation' in r) setSkimNote(`${r.providerId} is a hosted provider. Confirm once in Settings what gets sent.`)
+        else {
+          setSkimItems(r)
+          setSkimNote(r.length ? '' : 'The model returned no sentence that exists in this paper. Try a larger model.')
+        }
+      } catch (e) {
+        setSkimNote((e as Error).message)
+      }
+    })
+  }
+  useEffect(() => {
+    setSkimRects(Object.fromEntries(skimItems.map((it) => [it.id, locate(it.pageIndex, it.quote) ?? []])))
+  }, [skimItems])
+  const shownSkim = skim ? pickOverlays(skimItems, density, hiddenLabels) : []
 
   const onSelection = (force?: Mark) => {
     const sel = window.getSelection()
@@ -304,6 +343,7 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
       else if (e.key === 'PageUp') jump(page - 1)
       else if (e.key === '+' || e.key === '=') setZoom((z) => z * ZOOM_STEP)
       else if (e.key === '-') setZoom((z) => z / ZOOM_STEP)
+      else if (e.key === 'k') toggleSkim()
       else if (e.key === 'h') setTool('highlight')
       else if (e.key === 'u') setTool('underline')
       else if (e.key === 's') setTool('strike')
@@ -480,6 +520,9 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
           />
           <span className="inline-block h-3 w-3 rounded-sm" style={{ background: color }} title="Active color" />
           <span className="text-muted">{tool === 'select' ? 'SELECT' : tool.toUpperCase()}</span>
+          <button aria-pressed={skim} onClick={toggleSkim} className={`rounded px-2 py-0.5 font-bold ${skim ? 'bg-active text-accent' : 'text-muted'}`}>
+            SKIM
+          </button>
           <span className="ml-auto text-muted">{Math.round(zoom * 100)}%</span>
           <button aria-label="Zoom out" onClick={() => setZoom((z) => z / ZOOM_STEP)} className="px-1">−</button>
           <button aria-label="Zoom in" onClick={() => setZoom((z) => z * ZOOM_STEP)} className="px-1">+</button>
@@ -490,6 +533,23 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
             FIT
           </button>
         </div>
+        {skim && (
+          <div data-testid="skim-bar" className="flex h-8 shrink-0 items-center gap-3 border-b border-line bg-panel px-4 text-[10px]">
+            {SKIM_LABELS.map((l) => (
+              <label key={l} className="flex items-center gap-1 text-muted">
+                <input type="checkbox" aria-label={l} checked={!hiddenLabels.includes(l)} onChange={() => setHiddenLabels(toggle(hiddenLabels, l))} />
+                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: SKIM_COLORS[l] }} />
+                {l}
+              </label>
+            ))}
+            <label className="ml-2 flex items-center gap-2 text-muted">
+              density
+              <input type="range" aria-label="Density" min={DENSITY.min} max={DENSITY.max} value={density} onChange={(e) => setDensity(+e.target.value)} className="w-24 accent-accent" />
+              {shownSkim.length} / {skimItems.length}
+            </label>
+            <span className="ml-auto text-muted">{skimNote || 'AI overlays · verified against page text · never written to the PDF'}</span>
+          </div>
+        )}
         <div ref={scroller} onScroll={onScroll} onMouseUp={() => onSelection()} onDoubleClick={() => onSelection('highlight')} onMouseOver={onHover} onClick={() => setCard(null)} className="relative min-h-0 flex-1 overflow-auto bg-bg p-6">
           {Array.from({ length: doc.numPages }, (_, i) => (
             <div
@@ -503,6 +563,19 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
             >
               <PageCanvas doc={doc} index={i} scale={zoom} text />
               <AnnotationLayer annotations={annots.filter((a) => a.page_index === i && isShown(a, filter))} selectedId={selected} onSelect={setSelected} />
+              {shownSkim
+                .filter((it) => it.pageIndex === i)
+                .flatMap((it) =>
+                  (skimRects[it.id] ?? []).map((r, k) => (
+                    <div
+                      key={`${it.id}-${k}`}
+                      data-skim={it.label}
+                      title={`${it.label}: ${it.quote}`}
+                      className="pointer-events-none absolute mix-blend-multiply"
+                      style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%`, width: `${r.w * 100}%`, height: `${r.h * 100}%`, background: `repeating-linear-gradient(45deg, ${SKIM_COLORS[it.label]}99 0 3px, ${SKIM_COLORS[it.label]}33 3px 7px)` }}
+                    />
+                  )),
+                )}
               {flash?.page === i && (
                 <div data-flash className="pointer-events-none absolute inset-0">
                   {flash.rects.map((r, k) => (
@@ -553,7 +626,7 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
         {toast && (
           <div className="pointer-events-none absolute bottom-10 left-1/2 -translate-x-1/2 rounded bg-raised px-3 py-1 text-[11px] text-text">{toast}</div>
         )}
-        <p className="h-6 shrink-0 px-4 text-[10px] leading-6 text-muted">SPACE next     H / U / S mark     1-9 color     DEL remove     ⌘Z undo     ⌘\\ ask     ESC select</p>
+        <p className="h-6 shrink-0 px-4 text-[10px] leading-6 text-muted">SPACE next     H / U / S mark     1-9 color     DEL remove     ⌘Z undo     ⌘\\ ask     K skim     ESC select</p>
       </div>
 
       <aside className={`flex ${side === 'ask' ? 'w-[340px]' : 'w-[260px]'} shrink-0 flex-col gap-3 border-l border-line bg-panel p-3 text-[11px]`}>

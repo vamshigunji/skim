@@ -8,6 +8,7 @@ import { listReferences, listRegions } from './services/references'
 import { createKeychain } from './services/ai/keys'
 import { createAiService } from './services/ai/service'
 import { askGrounded, listThread } from './services/ai/ask'
+import { listSkim, runSkim } from './services/ai/skim'
 import type { AskDelta, AskRequest, GroundedAsk, ProviderConfig } from '../shared/types/ai'
 import type { AnnotationInput } from '../shared/annot'
 import type { SearchRequest } from '../shared/types/search'
@@ -27,6 +28,8 @@ app.whenReady().then(() => {
   ipcMain.handle('ai.ask', (_e, req: AskRequest) => ai.ask(req))
   ipcMain.handle('ai.askGrounded', (_e, req: GroundedAsk) => askGrounded(db, ai, req, (d) => broadcast(`ai.stream:${req.requestId}`, d)))
   ipcMain.handle('ai.thread', (_e, path: string) => listThread(db, path))
+  ipcMain.handle('ai.skim', (_e, req: { requestId: string; path: string }) => runSkim(db, ai, req))
+  ipcMain.handle('ai.skimList', (_e, path: string) => listSkim(db, path))
   ipcMain.handle('ai.cancel', (_e, id: string) => ai.cancel(id))
   ipcMain.handle('ai.usage', () => ai.usage())
 
