@@ -2,6 +2,7 @@ import type { ImportResult, LibraryItem } from '../shared/types/library'
 import type { SearchHit, SearchRequest } from '../shared/types/search'
 import type { AnnotationInput } from '../shared/annot'
 import type { Annotation } from '../shared/types/db'
+import type { ReferenceView, RegionView } from '../shared/types/references'
 
 export interface OpenedPdf {
   path: string
@@ -22,6 +23,8 @@ export interface SkimApi {
     delete: (id: string) => Promise<void>
   }
   onOpen: (cb: (paperId: string) => void) => void
+  references: (path: string) => Promise<ReferenceView[]>
+  regions: (path: string) => Promise<RegionView[]>
   pathsFor: (files: File[]) => string[]
 }
 

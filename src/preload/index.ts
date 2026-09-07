@@ -16,6 +16,8 @@ const api: SkimApi = {
     delete: (id) => ipcRenderer.invoke('annotations.delete', id),
   },
   onOpen: (cb) => ipcRenderer.on('open-paper', (_e, id: string) => cb(id)),
+  references: (path) => ipcRenderer.invoke('references.list', path),
+  regions: (path) => ipcRenderer.invoke('regions.list', path),
   pathsFor: (files) => files.map((f) => webUtils.getPathForFile(f)),
 }
 contextBridge.exposeInMainWorld('skim', api)

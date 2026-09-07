@@ -87,7 +87,7 @@ export function App() {
 
         <main className="relative min-w-0 flex-1">
           {view === 'reading' && doc ? (
-            <Reader key={doc.path} path={doc.path} data={doc.data} initialPage={openAt} />
+            <Reader key={doc.path} path={doc.path} data={doc.data} initialPage={openAt} onOpenPaper={openPaper} />
           ) : view === 'library' || view === 'queue' ? (
             <Library
               items={view === 'queue' ? items.filter((i) => i.reading_status === 'to_read' || i.reading_status === 'skimming') : items}

@@ -4,7 +4,10 @@ import { toFractions, type FracRect } from '../../shared/annot'
 import { labelsFor, parseGoto } from '../../shared/labels'
 import type { Annotation } from '../../shared/types/db'
 import type { SearchHit, SearchOptions } from '../../shared/types/search'
+import type { ReferenceView, RegionView } from '../../shared/types/references'
 import { AnnotationLayer } from './AnnotationLayer'
+import { HoverCard, type Target } from './HoverCard'
+import { markMentions } from './mentions'
 import { AnnotationsPanel, isShown, type Filter } from './AnnotationsPanel'
 import { createHistory } from './history'
 import { loadPdf, renderTextLayer, type PdfDoc } from './pdf'
@@ -15,6 +18,7 @@ interface Props {
   path: string
   data: Uint8Array
   initialPage?: number
+  onOpenPaper: (paperId: string) => void
 }
 
 type Mark = 'highlight' | 'underline' | 'strike'
@@ -26,14 +30,14 @@ const marks: [Mark, string][] = [
 ]
 const ZOOM_STEP = 1.25
 
-export function Reader({ path, data, initialPage }: Props) {
+export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
   const saved = loadPosition(path)
   const [doc, setDoc] = useState<PdfDoc | null>(null)
   const [page, setPage] = useState(initialPage ?? saved?.page ?? 0)
   const [zoom, setZoom] = useState(saved?.zoom ?? 1)
   const [offset, setOffset] = useState(saved?.offset)
   const [filter, setFilter] = useState<Filter>(saved?.filter ?? { colors: [], kinds: [] })
-  const [tab, setTab] = useState<'pages' | 'outline' | 'search'>('pages')
+  const [tab, setTab] = useState<'pages' | 'outline' | 'search' | 'refs'>('pages')
   const [toast, setToast] = useState<string | null>(null)
   const [goto, setGoto] = useState('')
   const [find, setFind] = useState('')
@@ -47,6 +51,11 @@ export function Reader({ path, data, initialPage }: Props) {
   const [palette, setPalette] = useState<Palette>(loadPalette)
   const [colorIdx, setColorIdx] = useState(0)
   const [bar, setBar] = useState<{ x: number; y: number; page: number; rects: FracRect[]; text: string } | null>(null)
+  const [refs, setRefs] = useState<ReferenceView[]>([])
+  const [regions, setRegions] = useState<RegionView[]>([])
+  const [card, setCard] = useState<{ target: Target; x: number; y: number } | null>(null)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const navStack = useRef<number[]>([])
   const findRef = useRef<HTMLInputElement>(null)
   const pages = useRef<(HTMLDivElement | null)[]>([])
   const scroller = useRef<HTMLDivElement>(null)
@@ -56,6 +65,8 @@ export function Reader({ path, data, initialPage }: Props) {
   useEffect(() => {
     loadPdf(data).then(setDoc)
     window.skim?.annotations.list(path).then(setAnnots)
+    window.skim?.references(path).then(setRefs)
+    window.skim?.regions(path).then(setRegions)
   }, [data, path])
 
   useEffect(() => {
@@ -80,6 +91,45 @@ export function Reader({ path, data, initialPage }: Props) {
   useEffect(() => {
     if (initialPage !== undefined) jump(initialPage)
   }, [initialPage])
+
+  // Browser-style history for jumps from cards, outline, and references. Backspace / Alt+Left return.
+  const go = (i: number) => {
+    navStack.current.push(page)
+    setCard(null)
+    jump(i)
+  }
+  const back = () => {
+    const prev = navStack.current.pop()
+    if (prev !== undefined) jump(prev)
+  }
+
+  const showCard = (mark: HTMLElement) => {
+    let target: Target | null = null
+    if (mark.dataset.ref) {
+      const key = mark.dataset.ref
+      const [surname, year] = key.split(':')
+      const ref = /^\d+$/.test(key)
+        ? refs.find((r) => r.ordinal === +key)
+        : refs.find((r) => {
+            const p = JSON.parse(r.parsed_json)
+            return String(p.year) === year && p.surnames?.some((s: string) => s.toLowerCase() === surname)
+          })
+      if (ref) target = { kind: 'cite', ref }
+    } else if (mark.dataset.region && doc) {
+      const [kind, label] = mark.dataset.region.split(':')
+      const region = regions.find((r) => r.kind === kind && r.label === label)
+      if (region) target = { kind: 'region', region, doc }
+    }
+    if (!target) return
+    const r = mark.getBoundingClientRect()
+    const s = scroller.current!.getBoundingClientRect()
+    setCard({ target, x: Math.min(r.left - s.left + scroller.current!.scrollLeft, s.width - 360), y: r.bottom - s.top + scroller.current!.scrollTop + 6 })
+  }
+  const onHover = (e: React.MouseEvent) => {
+    const mark = (e.target as Element).closest?.('mark.ref') as HTMLElement | null
+    clearTimeout(hoverTimer.current)
+    if (mark) hoverTimer.current = setTimeout(() => showCard(mark), 250)
+  }
 
   const runFind = (dir: 1 | -1 = 1) => {
     if (find !== searched || !hits.length) {
@@ -165,14 +215,17 @@ export function Reader({ path, data, initialPage }: Props) {
         return
       }
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.metaKey) return
+      if (e.altKey && e.key === 'ArrowLeft') return back()
       if (e.key === 'Escape') {
         setSelected(null)
         setBar(null)
+        setCard(null)
         setTool('select')
         window.getSelection()?.removeAllRanges()
         return
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selected) del(selected)
+      else if (e.key === 'Backspace') back()
       else if (e.key === ' ' || e.key === 'PageDown') jump(page + (e.shiftKey ? -1 : 1))
       else if (e.key === 'PageUp') jump(page - 1)
       else if (e.key === '+' || e.key === '=') setZoom((z) => z * ZOOM_STEP)
@@ -209,9 +262,9 @@ export function Reader({ path, data, initialPage }: Props) {
 
   return (
     <div className="flex h-full min-h-0">
-      <aside className={`flex ${tab === 'search' ? 'w-[260px]' : 'w-[140px]'} shrink-0 flex-col border-r border-line bg-panel text-[9px]`}>
-        <div className="flex gap-1 p-2">
-          {(['pages', 'outline', 'search'] as const).map((t) => (
+      <aside className={`flex ${tab === 'pages' || tab === 'outline' ? 'w-[140px]' : 'w-[260px]'} shrink-0 flex-col border-r border-line bg-panel text-[9px]`}>
+        <div className="flex flex-wrap gap-1 p-2">
+          {(['pages', 'outline', 'search', 'refs'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -237,13 +290,33 @@ export function Reader({ path, data, initialPage }: Props) {
           {tab === 'outline' &&
             (doc.outline.length ? (
               doc.outline.map((o, k) => (
-                <button key={k} onClick={() => jump(o.pageIndex)} className="block w-full py-1 text-left text-[11px] text-text-2 hover:text-text">
+                <button key={k} onClick={() => go(o.pageIndex)} className="block w-full py-1 text-left text-[11px] text-text-2 hover:text-text">
                   {o.title}
                 </button>
               ))
             ) : (
               <p className="py-2 text-muted">No outline</p>
             ))}
+          {tab === 'refs' && (
+            <ul data-testid="references" className="flex flex-col gap-2 py-1 text-[11px]">
+              {refs.map((r) => {
+                const p = JSON.parse(r.parsed_json)
+                return (
+                  <li key={r.id}>
+                    <button onClick={() => go(r.page_index)} className="w-full text-left">
+                      <span className="mr-2 font-bold text-accent">{r.label ?? r.ordinal}</span>
+                      <span className={r.library_paper_id ? 'text-green' : 'text-muted'}>{r.library_paper_id ? '●' : '○'}</span>
+                      <span className="block font-reading text-xs text-text">{p.title ?? r.raw}</span>
+                      <span className="text-muted">
+                        {p.year ?? ''} · {r.mentions} mention{r.mentions === 1 ? '' : 's'}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+              {refs.length === 0 && <li className="text-muted">No bibliography detected.</li>}
+            </ul>
+          )}
           {tab === 'search' && (
             <div className="flex flex-col gap-2 py-1 text-[11px]">
               <input
@@ -343,7 +416,7 @@ export function Reader({ path, data, initialPage }: Props) {
             FIT
           </button>
         </div>
-        <div ref={scroller} onScroll={onScroll} onMouseUp={() => onSelection()} onDoubleClick={() => onSelection('highlight')} className="relative min-h-0 flex-1 overflow-auto bg-bg p-6">
+        <div ref={scroller} onScroll={onScroll} onMouseUp={() => onSelection()} onDoubleClick={() => onSelection('highlight')} onMouseOver={onHover} onClick={() => setCard(null)} className="relative min-h-0 flex-1 overflow-auto bg-bg p-6">
           {Array.from({ length: doc.numPages }, (_, i) => (
             <div
               key={i}
@@ -358,6 +431,11 @@ export function Reader({ path, data, initialPage }: Props) {
               <AnnotationLayer annotations={annots.filter((a) => a.page_index === i && isShown(a, filter))} selectedId={selected} onSelect={setSelected} />
             </div>
           ))}
+          {card && (
+            <div className="absolute z-20" style={{ left: card.x, top: card.y }} onClick={(e) => e.stopPropagation()} onMouseLeave={() => setCard(null)}>
+              <HoverCard target={card.target} onJump={go} onOpenPaper={onOpenPaper} />
+            </div>
+          )}
           {bar && (
             <div data-testid="selection-bar" className="absolute z-10 flex gap-1 rounded bg-raised p-1 text-[10px] shadow-lg" style={{ left: bar.x, top: bar.y }} onMouseUp={(e) => e.stopPropagation()}>
               {marks.map(([kind, key]) => (
@@ -437,7 +515,7 @@ function PageCanvas({ doc, index, scale, text }: { doc: PdfDoc; index: number; s
       canvas.style.width = `${vp.width / dpr}px`
       canvas.style.height = `${vp.height / dpr}px`
       p.render({ canvasContext: ctx, viewport: vp, canvas })
-      if (text && textRef.current) renderTextLayer(p, textRef.current, scale)
+      if (text && textRef.current) renderTextLayer(p, textRef.current, scale).then(() => markMentions(textRef.current!))
     })
     return () => {
       cancelled = true

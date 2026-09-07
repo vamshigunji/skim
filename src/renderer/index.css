@@ -20,6 +20,13 @@
   --font-reading: Newsreader, Georgia, serif;
 }
 
+.textLayer mark.ref {
+  background: transparent;
+  color: transparent;
+  border-bottom: 1px dotted var(--color-accent);
+  cursor: pointer;
+}
+
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
