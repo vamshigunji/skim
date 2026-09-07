@@ -1,7 +1,8 @@
 import type { ImportResult, LibraryItem } from '../shared/types/library'
 import type { SearchHit, SearchRequest } from '../shared/types/search'
 import type { AnnotationInput } from '../shared/annot'
-import type { Annotation } from '../shared/types/db'
+import type { Annotation, Paper } from '../shared/types/db'
+import type { CiteStyle, NoteView } from '../shared/export'
 import type { ReferenceView, RegionView } from '../shared/types/references'
 import type { SkimItem } from '../shared/skim'
 import type { AskDelta, AskMessage, AskRequest, AskResult, ChatDelta, GroundedAsk, ProviderConfig, ProviderStatus, UsageSummary } from '../shared/types/ai'
@@ -25,6 +26,11 @@ export interface SkimApi {
     delete: (id: string) => Promise<void>
   }
   onOpen: (cb: (paperId: string) => void) => void
+  notes: {
+    list: () => Promise<NoteView[]>
+    paper: (paperId: string) => Promise<Paper>
+    export: (req: { paperId: string; ids?: string[]; style: CiteStyle; path?: string }) => Promise<{ path: string; count: number } | null>
+  }
   references: (path: string) => Promise<ReferenceView[]>
   regions: (path: string) => Promise<RegionView[]>
   pathsFor: (files: File[]) => string[]

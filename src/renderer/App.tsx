@@ -6,6 +6,8 @@ import type { ProviderStatus, UsageSummary } from '../shared/types/ai'
 import { Settings } from './settings/Settings'
 import { CommandPalette } from './CommandPalette'
 import { Library } from './library/Library'
+import { Notes } from './notes/Notes'
+import type { NoteView } from '../shared/export'
 import { keys, smartViews, views, type ViewId } from './nav'
 import { Reader } from './reader/Reader'
 
@@ -22,6 +24,8 @@ export function App() {
   const [aiOn, setAiOn] = useState(true)
   const [usage, setUsage] = useState<UsageSummary>({ requests: 0, input: 0, output: 0, cost_usd: 0 })
   const [testOutput, setTestOutput] = useState('')
+  const [notes, setNotes] = useState<NoteView[]>([])
+  const [receipt, setReceipt] = useState('')
 
   const loadAi = () => {
     window.skim?.ai.providers().then(setProviders)
@@ -71,6 +75,9 @@ export function App() {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
+  useEffect(() => {
+    if (view === 'notes') window.skim?.notes.list().then(setNotes)
+  }, [view])
   const active = views.find((v) => v.id === view)!
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -126,6 +133,17 @@ export function App() {
               onSetProvider={(cfg) => window.skim?.ai.setProvider(cfg).then(loadAi)}
               onConfirmEgress={(id) => window.skim?.ai.confirmEgress(id).then(loadAi)}
               onTest={runTest}
+            />
+          ) : view === 'notes' ? (
+            <Notes
+              notes={notes}
+              receipt={receipt}
+              onOpen={openPaper}
+              paper={(id) => window.skim!.notes.paper(id)}
+              onCopy={(text) => navigator.clipboard.writeText(text).then(() => setReceipt(`Copied: ${text.split('\n')[0]}`))}
+              onExport={(paperId, ids, style) =>
+                window.skim?.notes.export({ paperId, ids, style }).then((r) => setReceipt(r ? `✓ ${r.path} · ${r.count} note${r.count === 1 ? '' : 's'} · re-export updates in place` : ''))
+              }
             />
           ) : view === 'library' || view === 'queue' ? (
             <Library

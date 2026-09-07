@@ -37,6 +37,11 @@ const api: SkimApi = {
     upsert: (path, a) => ipcRenderer.invoke('annotations.upsert', path, a),
     delete: (id) => ipcRenderer.invoke('annotations.delete', id),
   },
+  notes: {
+    list: () => ipcRenderer.invoke('notes.list'),
+    paper: (id) => ipcRenderer.invoke('notes.paper', id),
+    export: (req) => ipcRenderer.invoke('notes.export', req),
+  },
   onOpen: (cb) => ipcRenderer.on('open-paper', (_e, id: string) => cb(id)),
   references: (path) => ipcRenderer.invoke('references.list', path),
   regions: (path) => ipcRenderer.invoke('regions.list', path),

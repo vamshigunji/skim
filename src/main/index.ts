@@ -5,6 +5,7 @@ import { importPdfs, listLibrary, openPaper } from './services/library'
 import { searchExact } from './services/search'
 import { deleteAnnotation, listAnnotations, upsertAnnotation } from './services/annotations'
 import { listReferences, listRegions } from './services/references'
+import { exportMarkdown, listNotes, paperWithCitekey, type ExportRequest } from './services/notes'
 import { createKeychain } from './services/ai/keys'
 import { createAiService } from './services/ai/service'
 import { askGrounded, listThread } from './services/ai/ask'
@@ -42,6 +43,12 @@ app.whenReady().then(() => {
   ipcMain.handle('annotations.delete', (_e, id: string) => deleteAnnotation(db, id))
   ipcMain.handle('references.list', (_e, path: string) => listReferences(db, path))
   ipcMain.handle('regions.list', (_e, path: string) => listRegions(db, path))
+  ipcMain.handle('notes.list', () => listNotes(db))
+  ipcMain.handle('notes.paper', (_e, paperId: string) => paperWithCitekey(db, paperId))
+  ipcMain.handle('notes.export', async (_e, req: Omit<ExportRequest, 'path'> & { path?: string }) => {
+    const path = req.path ?? (await dialog.showSaveDialog({ defaultPath: `${paperWithCitekey(db, req.paperId).citekey}-notes.md`, filters: [{ name: 'Markdown', extensions: ['md'] }] })).filePath
+    return path ? exportMarkdown(db, { ...req, path }) : null
+  })
   ipcMain.handle('import-dialog', async () => {
     const r = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'], filters: [{ name: 'PDF', extensions: ['pdf'] }] })
     return r.canceled ? [] : importPdfs(db, r.filePaths)
