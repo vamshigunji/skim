@@ -1,11 +1,19 @@
+import type { ImportResult, LibraryItem } from '../shared/types/library'
+
 export interface OpenedPdf {
   path: string
   data: Uint8Array
 }
 
 export interface SkimApi {
-  openDialog: () => Promise<OpenedPdf | null>
-  onOpen: (cb: (doc: OpenedPdf) => void) => void
+  library: {
+    list: () => Promise<LibraryItem[]>
+    import: (paths: string[]) => Promise<ImportResult[]>
+    open: (paperId: string) => Promise<OpenedPdf | null>
+  }
+  importDialog: () => Promise<ImportResult[]>
+  onOpen: (cb: (paperId: string) => void) => void
+  pathsFor: (files: File[]) => string[]
 }
 
 declare global {

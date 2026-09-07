@@ -1,32 +1,40 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { openDb } from './db'
+import { importPdfs, listLibrary, openPaper } from './services/library'
 
 if (process.env.SKIM_USER_DATA) app.setPath('userData', process.env.SKIM_USER_DATA)
 
-const readPdf = (path: string) => ({ path, data: readFileSync(path) })
-
-function createWindow() {
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 860,
-    useContentSize: true,
-    backgroundColor: '#1A1B26',
-    webPreferences: { preload: join(__dirname, '../preload/index.mjs'), sandbox: false },
-  })
-  if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
-  else win.loadFile(join(__dirname, '../renderer/index.html'))
-
-  const fromCli = process.argv.slice(1).find((a) => a.toLowerCase().endsWith('.pdf'))
-  if (fromCli) win.webContents.on('did-finish-load', () => win.webContents.send('open-pdf', readPdf(fromCli)))
-}
-
-ipcMain.handle('open-dialog', async () => {
-  const r = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'PDF', extensions: ['pdf'] }] })
-  return r.canceled ? null : readPdf(r.filePaths[0])
-})
-
 app.whenReady().then(() => {
+  const db = openDb(join(app.getPath('userData'), 'library.db'))
+
+  ipcMain.handle('library.list', () => listLibrary(db))
+  ipcMain.handle('library.import', (_e, paths: string[]) => importPdfs(db, paths))
+  ipcMain.handle('library.open', (_e, id: string) => openPaper(db, id))
+  ipcMain.handle('import-dialog', async () => {
+    const r = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'], filters: [{ name: 'PDF', extensions: ['pdf'] }] })
+    return r.canceled ? [] : importPdfs(db, r.filePaths)
+  })
+
+  const createWindow = () => {
+    const win = new BrowserWindow({
+      width: 1280,
+      height: 860,
+      useContentSize: true,
+      backgroundColor: '#1A1B26',
+      webPreferences: { preload: join(__dirname, '../preload/index.mjs'), sandbox: false },
+    })
+    if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
+    else win.loadFile(join(__dirname, '../renderer/index.html'))
+
+    const fromCli = process.argv.slice(1).find((a) => a.toLowerCase().endsWith('.pdf'))
+    if (fromCli)
+      win.webContents.on('did-finish-load', async () => {
+        const [r] = await importPdfs(db, [fromCli])
+        win.webContents.send('open-paper', r.paperId)
+      })
+  }
+
   createWindow()
   app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
 })
