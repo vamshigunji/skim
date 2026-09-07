@@ -1,7 +1,10 @@
+import type { Filter } from './AnnotationsPanel'
+
 export interface Position {
   page: number
   zoom: number
   offset?: number
+  filter?: Filter
 }
 
 // Per-document view state keyed by path. Lives in the renderer until the sidecar lands with T04.

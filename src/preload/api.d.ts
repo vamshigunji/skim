@@ -1,5 +1,7 @@
 import type { ImportResult, LibraryItem } from '../shared/types/library'
 import type { SearchHit, SearchRequest } from '../shared/types/search'
+import type { AnnotationInput } from '../shared/annot'
+import type { Annotation } from '../shared/types/db'
 
 export interface OpenedPdf {
   path: string
@@ -14,6 +16,11 @@ export interface SkimApi {
   }
   importDialog: () => Promise<ImportResult[]>
   search: (req: SearchRequest) => Promise<SearchHit[]>
+  annotations: {
+    list: (path: string) => Promise<Annotation[]>
+    upsert: (path: string, a: AnnotationInput) => Promise<void>
+    delete: (id: string) => Promise<void>
+  }
   onOpen: (cb: (paperId: string) => void) => void
   pathsFor: (files: File[]) => string[]
 }

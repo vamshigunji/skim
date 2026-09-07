@@ -10,6 +10,11 @@ const api: SkimApi = {
   },
   importDialog: () => ipcRenderer.invoke('import-dialog'),
   search: (req) => ipcRenderer.invoke('search.exact', req),
+  annotations: {
+    list: (path) => ipcRenderer.invoke('annotations.list', path),
+    upsert: (path, a) => ipcRenderer.invoke('annotations.upsert', path, a),
+    delete: (id) => ipcRenderer.invoke('annotations.delete', id),
+  },
   onOpen: (cb) => ipcRenderer.on('open-paper', (_e, id: string) => cb(id)),
   pathsFor: (files) => files.map((f) => webUtils.getPathForFile(f)),
 }

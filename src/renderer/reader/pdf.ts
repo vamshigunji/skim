@@ -11,6 +11,13 @@ export interface PdfDoc {
   getPage: (index: number) => Promise<PDFPageProxy>
 }
 
+// Transparent text spans over the canvas so the browser can select text. CSS from pdfjs-dist/web/pdf_viewer.css.
+export function renderTextLayer(page: PDFPageProxy, container: HTMLElement, scale: number) {
+  container.replaceChildren()
+  container.style.setProperty('--scale-factor', String(scale))
+  return new pdfjs.TextLayer({ textContentSource: page.streamTextContent(), container, viewport: page.getViewport({ scale }) }).render()
+}
+
 export async function loadPdf(data: Uint8Array): Promise<PdfDoc> {
   const doc = await pdfjs.getDocument({ data }).promise
   const outline: PdfDoc['outline'] = []

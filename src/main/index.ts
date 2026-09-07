@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import { openDb } from './db'
 import { importPdfs, listLibrary, openPaper } from './services/library'
 import { searchExact } from './services/search'
+import { deleteAnnotation, listAnnotations, upsertAnnotation } from './services/annotations'
+import type { AnnotationInput } from '../shared/annot'
 import type { SearchRequest } from '../shared/types/search'
 
 if (process.env.SKIM_USER_DATA) app.setPath('userData', process.env.SKIM_USER_DATA)
@@ -14,6 +16,9 @@ app.whenReady().then(() => {
   ipcMain.handle('library.import', (_e, paths: string[]) => importPdfs(db, paths))
   ipcMain.handle('library.open', (_e, id: string) => openPaper(db, id))
   ipcMain.handle('search.exact', (_e, req: SearchRequest) => searchExact(db, req))
+  ipcMain.handle('annotations.list', (_e, path: string) => listAnnotations(db, path))
+  ipcMain.handle('annotations.upsert', (_e, path: string, a: AnnotationInput) => upsertAnnotation(db, path, a))
+  ipcMain.handle('annotations.delete', (_e, id: string) => deleteAnnotation(db, id))
   ipcMain.handle('import-dialog', async () => {
     const r = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'], filters: [{ name: 'PDF', extensions: ['pdf'] }] })
     return r.canceled ? [] : importPdfs(db, r.filePaths)
