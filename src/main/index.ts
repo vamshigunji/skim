@@ -7,7 +7,8 @@ import { deleteAnnotation, listAnnotations, upsertAnnotation } from './services/
 import { listReferences, listRegions } from './services/references'
 import { createKeychain } from './services/ai/keys'
 import { createAiService } from './services/ai/service'
-import type { AskRequest, ProviderConfig } from '../shared/types/ai'
+import { askGrounded, listThread } from './services/ai/ask'
+import type { AskDelta, AskRequest, GroundedAsk, ProviderConfig } from '../shared/types/ai'
 import type { AnnotationInput } from '../shared/annot'
 import type { SearchRequest } from '../shared/types/search'
 
@@ -15,9 +16,8 @@ if (process.env.SKIM_USER_DATA) app.setPath('userData', process.env.SKIM_USER_DA
 
 app.whenReady().then(() => {
   const db = openDb(join(app.getPath('userData'), 'library.db'))
-  const ai = createAiService(db, createKeychain(app.getPath('userData'), safeStorage), (channel, delta) =>
-    BrowserWindow.getAllWindows().forEach((w) => w.webContents.send(channel, delta)),
-  )
+  const broadcast = (channel: string, delta: AskDelta) => BrowserWindow.getAllWindows().forEach((w) => w.webContents.send(channel, delta))
+  const ai = createAiService(db, createKeychain(app.getPath('userData'), safeStorage), broadcast)
   ipcMain.handle('ai.providers', () => ai.providers())
   ipcMain.handle('ai.setProvider', (_e, cfg: ProviderConfig) => ai.setProvider(cfg))
   ipcMain.handle('ai.setKey', (_e, id: string, key: string | null) => ai.setKey(id, key))
@@ -25,6 +25,8 @@ app.whenReady().then(() => {
   ipcMain.handle('ai.setEnabled', (_e, on: boolean) => ai.setEnabled(on))
   ipcMain.handle('ai.confirmEgress', (_e, id: string) => ai.confirmEgress(id))
   ipcMain.handle('ai.ask', (_e, req: AskRequest) => ai.ask(req))
+  ipcMain.handle('ai.askGrounded', (_e, req: GroundedAsk) => askGrounded(db, ai, req, (d) => broadcast(`ai.stream:${req.requestId}`, d)))
+  ipcMain.handle('ai.thread', (_e, path: string) => listThread(db, path))
   ipcMain.handle('ai.cancel', (_e, id: string) => ai.cancel(id))
   ipcMain.handle('ai.usage', () => ai.usage())
 

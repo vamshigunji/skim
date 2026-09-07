@@ -3,7 +3,7 @@ import type { SearchHit, SearchRequest } from '../shared/types/search'
 import type { AnnotationInput } from '../shared/annot'
 import type { Annotation } from '../shared/types/db'
 import type { ReferenceView, RegionView } from '../shared/types/references'
-import type { AskRequest, AskResult, ChatDelta, ProviderConfig, ProviderStatus, UsageSummary } from '../shared/types/ai'
+import type { AskDelta, AskMessage, AskRequest, AskResult, ChatDelta, GroundedAsk, ProviderConfig, ProviderStatus, UsageSummary } from '../shared/types/ai'
 
 export interface OpenedPdf {
   path: string
@@ -35,6 +35,8 @@ export interface SkimApi {
     setEnabled: (on: boolean) => Promise<void>
     confirmEgress: (id: string) => Promise<void>
     ask: (req: AskRequest, onDelta: (d: ChatDelta) => void) => Promise<AskResult>
+    askGrounded: (req: GroundedAsk, onDelta: (d: AskDelta) => void) => Promise<AskResult>
+    thread: (path: string) => Promise<AskMessage[]>
     cancel: (requestId: string) => Promise<void>
     usage: () => Promise<UsageSummary>
   }

@@ -42,7 +42,7 @@ export function createAiService(db: DatabaseSync, keychain: Keychain, send: (cha
         }),
       ),
 
-    async ask(req: AskRequest): Promise<AskResult> {
+    async ask(req: AskRequest, onDelta?: (d: ChatDelta) => void): Promise<AskResult> {
       if (!enabled()) throw new Error('AI is off. Turn it on in Settings to ask questions.')
       const cfg = rows().find((r) => (req.providerId ? r.id === req.providerId : r.is_default)) ?? rows()[0]
       const p = createProvider(cfg, keychain.get(cfg.id))
@@ -50,17 +50,17 @@ export function createAiService(db: DatabaseSync, keychain: Keychain, send: (cha
       if (!confirmed(cfg)) return { needsConfirmation: true, providerId: cfg.id, sends: EGRESS_SENDS }
       const ac = new AbortController()
       running.set(req.requestId, ac)
-      const channel = `ai.stream:${req.requestId}`
+      const emit = onDelta ?? ((d: ChatDelta) => send(`ai.stream:${req.requestId}`, d))
       ;(async () => {
         let input = 0
         let output = 0
         try {
           for await (const d of p.chat({ model: cfg.model ?? '', messages: req.messages }, ac.signal)) {
             if (d.type === 'usage') ({ input, output } = d)
-            send(channel, d)
+            emit(d)
           }
         } catch (e) {
-          send(channel, { type: 'error', message: ac.signal.aborted ? 'Cancelled' : (e as Error).message })
+          emit({ type: 'error', message: ac.signal.aborted ? 'Cancelled' : (e as Error).message })
         } finally {
           running.delete(req.requestId)
           if (input || output) recordUsage(db, { provider: cfg.id, model: cfg.model ?? '', purpose: req.purpose, input, output })

@@ -5,10 +5,13 @@ import { labelsFor, parseGoto } from '../../shared/labels'
 import type { Annotation } from '../../shared/types/db'
 import type { SearchHit, SearchOptions } from '../../shared/types/search'
 import type { ReferenceView, RegionView } from '../../shared/types/references'
+import type { AskMessage } from '../../shared/types/ai'
 import { AnnotationLayer } from './AnnotationLayer'
 import { HoverCard, type Target } from './HoverCard'
 import { markMentions } from './mentions'
 import { AnnotationsPanel, isShown, type Filter } from './AnnotationsPanel'
+import { AskPanel } from './AskPanel'
+import { findQuoteRange } from './locate'
 import { createHistory } from './history'
 import { loadPdf, renderTextLayer, type PdfDoc } from './pdf'
 import { loadPalette, savePalette, type Palette } from './palette'
@@ -54,6 +57,12 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
   const [refs, setRefs] = useState<ReferenceView[]>([])
   const [regions, setRegions] = useState<RegionView[]>([])
   const [card, setCard] = useState<{ target: Target; x: number; y: number } | null>(null)
+  const [side, setSide] = useState<'marks' | 'ask'>('marks')
+  const [messages, setMessages] = useState<AskMessage[]>([])
+  const [live, setLive] = useState<AskMessage | null>(null)
+  const [attached, setAttached] = useState<string | null>(null)
+  const [flash, setFlash] = useState<{ page: number; rects: FracRect[] } | null>(null)
+  const asking = useRef<string | null>(null)
   const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const navStack = useRef<number[]>([])
   const findRef = useRef<HTMLInputElement>(null)
@@ -67,6 +76,7 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
     window.skim?.annotations.list(path).then(setAnnots)
     window.skim?.references(path).then(setRefs)
     window.skim?.regions(path).then(setRegions)
+    window.skim?.ai.thread(path).then(setMessages)
   }, [data, path])
 
   useEffect(() => {
@@ -131,15 +141,21 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
     if (mark) hoverTimer.current = setTimeout(() => showCard(mark), 250)
   }
 
+  const search = (q: string) =>
+    window.skim?.search({ query: q, options: opts, path }).then((h) => {
+      setHits(h)
+      setSearched(q)
+      setCur(0)
+      if (h[0]) jump(h[0].page_index)
+    })
+  const findExact = (q: string) => {
+    setFind(q)
+    setTab('search')
+    search(q)
+  }
   const runFind = (dir: 1 | -1 = 1) => {
-    if (find !== searched || !hits.length) {
-      window.skim?.search({ query: find, options: opts, path }).then((h) => {
-        setHits(h)
-        setSearched(find)
-        setCur(0)
-        if (h[0]) jump(h[0].page_index)
-      })
-    } else {
+    if (find !== searched || !hits.length) search(find)
+    else {
       const n = (cur + dir + hits.length) % hits.length
       setCur(n)
       jump(hits[n].page_index)
@@ -182,6 +198,59 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
     return a.id
   }
 
+  // Grounded Ask. The live answer is built from deltas in the same shape as a stored message, so one renderer handles both.
+  const ask = (question: string) => {
+    const requestId = crypto.randomUUID()
+    const msg: AskMessage = { id: requestId, role: 'assistant', content: '', citations: [] }
+    const selection = attached
+    setAttached(null)
+    setMessages((m) => [...m, { id: `${requestId}-q`, role: 'user', content: question, citations: [] }])
+    setLive({ ...msg })
+    asking.current = requestId
+    const end = () => {
+      asking.current = null
+      setLive(null)
+      window.skim?.ai.thread(path).then(setMessages)
+    }
+    window.skim?.ai
+      .askGrounded({ requestId, path, question, selection }, (d) => {
+        if (d.type === 'text') msg.content += d.text
+        else if (d.type === 'citation') {
+          msg.citations = [...msg.citations, d.citation]
+          msg.content += `[[c:${d.citation.n} "${d.citation.quote}"]]`
+        } else if (d.type === 'state') msg.state = d.state
+        else if (d.type === 'error') msg.content += `\n[${d.message}]`
+        setLive({ ...msg })
+        if (d.type === 'done' || d.type === 'error') end()
+      })
+      .then((r) => {
+        if ('needsConfirmation' in r) {
+          msg.content = `[${r.providerId} is a hosted provider. Confirm once in Settings what gets sent, then ask again.]`
+          setLive({ ...msg })
+          asking.current = null
+        }
+      })
+      .catch((e: Error) => {
+        msg.content = `[${e.message}]`
+        setLive({ ...msg })
+        asking.current = null
+      })
+  }
+  // Land on the cited page and flash the verified quote for 3 seconds (features/04 requirement 3).
+  const jumpQuote = (i: number, quote: string) => {
+    go(i)
+    setTimeout(() => {
+      const pageEl = pages.current[i]
+      const r = pageEl && findQuoteRange(pageEl.querySelectorAll('.textLayer > *'), quote)
+      if (!r) return
+      const range = document.createRange()
+      range.setStart(r.start.node, r.start.offset)
+      range.setEnd(r.end.node, r.end.offset)
+      setFlash({ page: i, rects: toFractions([...range.getClientRects()], pageEl.getBoundingClientRect()) })
+      setTimeout(() => setFlash(null), 3000)
+    }, 50)
+  }
+
   const onSelection = (force?: Mark) => {
     const sel = window.getSelection()
     if (!sel || sel.isCollapsed) return
@@ -205,6 +274,11 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
       if (e.metaKey && e.key === 'f') {
         setTab('search')
         setTimeout(() => findRef.current?.focus())
+        e.preventDefault()
+        return
+      }
+      if (e.metaKey && e.key === '\\') {
+        setSide(side === 'ask' ? 'marks' : 'ask')
         e.preventDefault()
         return
       }
@@ -429,6 +503,13 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
             >
               <PageCanvas doc={doc} index={i} scale={zoom} text />
               <AnnotationLayer annotations={annots.filter((a) => a.page_index === i && isShown(a, filter))} selectedId={selected} onSelect={setSelected} />
+              {flash?.page === i && (
+                <div data-flash className="pointer-events-none absolute inset-0">
+                  {flash.rects.map((r, k) => (
+                    <div key={k} className="absolute rounded-sm bg-accent/40 outline outline-2 outline-accent" style={{ left: `${r.x * 100}%`, top: `${r.y * 100}%`, width: `${r.w * 100}%`, height: `${r.h * 100}%` }} />
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           {card && (
@@ -449,6 +530,16 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
               </button>
               <button
                 onClick={() => {
+                  setAttached(bar.text)
+                  setSide('ask')
+                  setBar(null)
+                }}
+                className="rounded px-2 py-1 font-bold text-text hover:bg-active"
+              >
+                ASK
+              </button>
+              <button
+                onClick={() => {
                   navigator.clipboard.writeText(bar.text)
                   setBar(null)
                 }}
@@ -462,11 +553,22 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
         {toast && (
           <div className="pointer-events-none absolute bottom-10 left-1/2 -translate-x-1/2 rounded bg-raised px-3 py-1 text-[11px] text-text">{toast}</div>
         )}
-        <p className="h-6 shrink-0 px-4 text-[10px] leading-6 text-muted">SPACE next     H / U / S mark     1-9 color     DEL remove     ⌘Z undo     ESC select</p>
+        <p className="h-6 shrink-0 px-4 text-[10px] leading-6 text-muted">SPACE next     H / U / S mark     1-9 color     DEL remove     ⌘Z undo     ⌘\\ ask     ESC select</p>
       </div>
 
-      <aside className="flex w-[260px] shrink-0 flex-col gap-3 border-l border-line bg-panel p-3 text-[11px]">
-        <div className="flex items-center gap-2">
+      <aside className={`flex ${side === 'ask' ? 'w-[340px]' : 'w-[260px]'} shrink-0 flex-col gap-3 border-l border-line bg-panel p-3 text-[11px]`}>
+        <div className="flex gap-1 text-[9px]">
+          {(['marks', 'ask'] as const).map((t) => (
+            <button key={t} onClick={() => setSide(t)} className={`rounded px-2 py-1 font-bold ${side === t ? 'bg-active text-text' : 'text-muted'}`}>
+              {t.toUpperCase()}
+            </button>
+          ))}
+        </div>
+        {side === 'ask' ? (
+          <AskPanel messages={messages} live={live} label={label} selection={attached} onAsk={ask} onStop={() => asking.current && window.skim?.ai.cancel(asking.current)} onJump={jumpQuote} onFind={findExact} />
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
           {marks.map(([kind, key]) => (
             <button
               key={kind}
@@ -493,7 +595,9 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
             )}
           </span>
         </div>
-        <AnnotationsPanel annotations={annots} palette={palette} filter={filter} selectedId={selected} onFilter={setFilter} onSelect={setSelected} onComment={(id, comment) => change(id, { comment })} />
+            <AnnotationsPanel annotations={annots} palette={palette} filter={filter} selectedId={selected} onFilter={setFilter} onSelect={setSelected} onComment={(id, comment) => change(id, { comment })} />
+          </>
+        )}
       </aside>
     </div>
   )

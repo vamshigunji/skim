@@ -8,3 +8,4 @@ playwright-report
 .claude/*.local.md
 .claude/settings.local.json
 .codex
+.serena/

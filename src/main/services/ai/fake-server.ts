@@ -24,7 +24,12 @@ export function startFakeServer() {
       }
       if (req.url === '/v1/chat/completions') {
         res.writeHead(200, { 'content-type': 'text/event-stream' })
-        for (const w of ['Hello', ' from', ' fake']) await chunk(`data: ${JSON.stringify({ choices: [{ delta: { content: w } }] })}\n\n`)
+        const answers: Record<string, string> = {
+          'grounded-model': 'Attention comes from scaled dot products [[c:2 "Scaled dot-product attention"]]. It also claims [[c:2 "this quote does not exist"]].',
+          'notfound-model': 'NOT_FOUND The passages do not mention a sample size.',
+        }
+        const words = answers[body?.model] ? answers[body.model].match(/.{1,13}/g)! : ['Hello', ' from', ' fake']
+        for (const w of words) await chunk(`data: ${JSON.stringify({ choices: [{ delta: { content: w } }] })}\n\n`)
         await chunk(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 5, completion_tokens: 3 } })}\n\n`)
         return res.end('data: [DONE]\n\n')
       }

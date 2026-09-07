@@ -1,6 +1,27 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { ChatDelta } from '../shared/types/ai'
+import type { AskResult } from '../shared/types/ai'
 import type { SkimApi } from './api'
+
+// Deltas for one request arrive on ai.stream:<requestId> until done or error.
+function streamed<D extends { type: string }>(name: string, req: { requestId: string }, onDelta: (d: D) => void): Promise<AskResult> {
+  const channel = `ai.stream:${req.requestId}`
+  const stop = () => ipcRenderer.removeListener(channel, listener)
+  const listener = (_e: unknown, d: D) => {
+    onDelta(d)
+    if (d.type === 'done' || d.type === 'error') stop()
+  }
+  ipcRenderer.on(channel, listener)
+  return ipcRenderer.invoke(name, req).then(
+    (r: AskResult) => {
+      if ('needsConfirmation' in r) stop()
+      return r
+    },
+    (e) => {
+      stop()
+      throw e
+    },
+  )
+}
 
 // window.skim is the only bridge between renderer and main. Grows per task.
 const api: SkimApi = {
@@ -27,18 +48,9 @@ const api: SkimApi = {
     enabled: () => ipcRenderer.invoke('ai.enabled'),
     setEnabled: (on) => ipcRenderer.invoke('ai.setEnabled', on),
     confirmEgress: (id) => ipcRenderer.invoke('ai.confirmEgress', id),
-    ask: (req, onDelta) => {
-      const channel = `ai.stream:${req.requestId}`
-      const listener = (_e: unknown, d: ChatDelta) => {
-        onDelta(d)
-        if (d.type === 'done' || d.type === 'error') ipcRenderer.removeListener(channel, listener)
-      }
-      ipcRenderer.on(channel, listener)
-      return ipcRenderer.invoke('ai.ask', req).catch((e) => {
-        ipcRenderer.removeListener(channel, listener)
-        throw e
-      })
-    },
+    ask: (req, onDelta) => streamed('ai.ask', req, onDelta),
+    askGrounded: (req, onDelta) => streamed('ai.askGrounded', req, onDelta),
+    thread: (path) => ipcRenderer.invoke('ai.thread', path),
     cancel: (id) => ipcRenderer.invoke('ai.cancel', id),
     usage: () => ipcRenderer.invoke('ai.usage'),
   },

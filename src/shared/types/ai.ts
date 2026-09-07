@@ -52,3 +52,37 @@ export const EGRESS_SENDS = [
   'Passages retrieved from the current paper or collection',
   'Paper titles and metadata needed to answer',
 ]
+
+// Grounded Ask (features/04, features/10, design/04). Everything below is shared by main, preload, and renderer.
+export type AnswerState = 'VERIFIED' | 'PARTIAL' | 'NOT_FOUND'
+
+export interface Citation {
+  n: number // ordinal within the answer, 1-based
+  pageIndex: number
+  quote: string
+  verified: boolean
+}
+
+export type AskDelta =
+  | ChatDelta
+  | { type: 'citation'; citation: Citation }
+  | { type: 'state'; state: AnswerState; verified: number; total: number }
+
+export interface AskMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string // raw model output; anchors are [[c:n "quote"]], NOT_FOUND prefix marks a refusal
+  citations: Citation[]
+  state?: AnswerState
+}
+
+export interface GroundedAsk {
+  requestId: string
+  path: string
+  question: string
+  selection?: string | null
+}
+
+// One rule for the header state, applied in main when the stream ends and in the renderer for stored answers.
+export const answerState = (content: string, citations: Citation[]): AnswerState =>
+  content.startsWith('NOT_FOUND') ? 'NOT_FOUND' : citations.length && citations.every((c) => c.verified) ? 'VERIFIED' : 'PARTIAL'
