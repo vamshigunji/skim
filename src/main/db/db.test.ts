@@ -110,3 +110,18 @@ describe('table()', () => {
     expect(papers.get('p1')).toBeUndefined()
   })
 })
+
+describe('migrations', () => {
+  it('upgrades an older database in place and leaves a backup', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'skim-'))
+    const path = join(dir, 'library.db')
+    const v1 = openDb(path)
+    v1.exec('DROP TABLE ai_usage; UPDATE schema_version SET version = 1')
+    v1.close()
+    const db = openDb(path)
+    expect(existsSync(`${path}.bak-1`)).toBe(true)
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name = 'ai_usage'").get()).toBeTruthy()
+    expect(db.prepare('SELECT version FROM schema_version').get()).toEqual({ version: SCHEMA_VERSION })
+    db.close()
+  })
+})

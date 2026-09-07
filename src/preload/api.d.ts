@@ -3,6 +3,7 @@ import type { SearchHit, SearchRequest } from '../shared/types/search'
 import type { AnnotationInput } from '../shared/annot'
 import type { Annotation } from '../shared/types/db'
 import type { ReferenceView, RegionView } from '../shared/types/references'
+import type { AskRequest, AskResult, ChatDelta, ProviderConfig, ProviderStatus, UsageSummary } from '../shared/types/ai'
 
 export interface OpenedPdf {
   path: string
@@ -26,6 +27,17 @@ export interface SkimApi {
   references: (path: string) => Promise<ReferenceView[]>
   regions: (path: string) => Promise<RegionView[]>
   pathsFor: (files: File[]) => string[]
+  ai: {
+    providers: () => Promise<ProviderStatus[]>
+    setProvider: (cfg: ProviderConfig) => Promise<void>
+    setKey: (id: string, key: string | null) => Promise<void>
+    enabled: () => Promise<boolean>
+    setEnabled: (on: boolean) => Promise<void>
+    confirmEgress: (id: string) => Promise<void>
+    ask: (req: AskRequest, onDelta: (d: ChatDelta) => void) => Promise<AskResult>
+    cancel: (requestId: string) => Promise<void>
+    usage: () => Promise<UsageSummary>
+  }
 }
 
 declare global {

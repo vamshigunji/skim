@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { OpenedPdf } from '../preload/api'
 import type { ImportResult, LibraryItem } from '../shared/types/library'
 import type { SearchHit } from '../shared/types/search'
+import type { ProviderStatus, UsageSummary } from '../shared/types/ai'
+import { Settings } from './settings/Settings'
 import { CommandPalette } from './CommandPalette'
 import { Library } from './library/Library'
 import { keys, smartViews, views, type ViewId } from './nav'
@@ -16,6 +18,30 @@ export function App() {
   const [items, setItems] = useState<LibraryItem[]>([])
   const [results, setResults] = useState<SearchHit[] | null>(null)
   const [openAt, setOpenAt] = useState<number | undefined>()
+  const [providers, setProviders] = useState<ProviderStatus[]>([])
+  const [aiOn, setAiOn] = useState(true)
+  const [usage, setUsage] = useState<UsageSummary>({ requests: 0, input: 0, output: 0, cost_usd: 0 })
+  const [testOutput, setTestOutput] = useState('')
+
+  const loadAi = () => {
+    window.skim?.ai.providers().then(setProviders)
+    window.skim?.ai.enabled().then(setAiOn)
+    window.skim?.ai.usage().then(setUsage)
+  }
+  const runTest = (id: string) => {
+    setTestOutput('…')
+    let out = ''
+    window.skim?.ai
+      .ask({ requestId: crypto.randomUUID(), providerId: id, purpose: 'test', messages: [{ role: 'user', content: 'Reply with a short greeting.' }] }, (d) => {
+        if (d.type === 'text') out += d.text
+        else if (d.type === 'error') out += `\n[${d.message}]`
+        setTestOutput(out)
+        if (d.type === 'done' || d.type === 'error') loadAi()
+      })
+      .catch((e: Error) => setTestOutput(`[${e.message}]`))
+  }
+  const defaultProvider = providers.find((p) => p.is_default)
+  const modelLabel = !aiOn ? 'AI OFF' : defaultProvider ? `${defaultProvider.kind.toUpperCase()} · ${defaultProvider.model ?? (defaultProvider.local ? 'LOCAL' : 'no model')}` : 'OLLAMA · LOCAL'
 
   const refresh = () => window.skim?.library.list().then(setItems)
   const openPaper = (id: string, pageIndex?: number) =>
@@ -32,6 +58,7 @@ export function App() {
 
   useEffect(() => {
     refresh()
+    loadAi()
     window.skim?.onOpen((id) => openPaper(id))
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === 'k') setPalette('commands')
@@ -56,7 +83,7 @@ export function App() {
       <header className="flex h-14 shrink-0 items-center gap-6 bg-raised px-6 text-[11px]">
         <span className="text-lg font-bold">SKIM</span>
         <span className="text-text-2">{active.label.toUpperCase()}</span>
-        <span className="ml-auto font-semibold text-accent">OLLAMA · LOCAL</span>
+        <span className={`ml-auto font-semibold ${aiOn ? 'text-accent' : 'text-muted'}`}>{modelLabel}</span>
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -88,6 +115,18 @@ export function App() {
         <main className="relative min-w-0 flex-1">
           {view === 'reading' && doc ? (
             <Reader key={doc.path} path={doc.path} data={doc.data} initialPage={openAt} onOpenPaper={openPaper} />
+          ) : view === 'settings' ? (
+            <Settings
+              providers={providers}
+              enabled={aiOn}
+              usage={usage}
+              testOutput={testOutput}
+              onToggle={(on) => window.skim?.ai.setEnabled(on).then(loadAi)}
+              onSetKey={(id, key) => window.skim?.ai.setKey(id, key || null).then(loadAi)}
+              onSetProvider={(cfg) => window.skim?.ai.setProvider(cfg).then(loadAi)}
+              onConfirmEgress={(id) => window.skim?.ai.confirmEgress(id).then(loadAi)}
+              onTest={runTest}
+            />
           ) : view === 'library' || view === 'queue' ? (
             <Library
               items={view === 'queue' ? items.filter((i) => i.reading_status === 'to_read' || i.reading_status === 'skimming') : items}

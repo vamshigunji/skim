@@ -1,4 +1,4 @@
-import { BookOpen, Library, Layers2, List, NotebookPen } from 'lucide-react'
+import { BookOpen, Library, Layers2, List, NotebookPen, Settings } from 'lucide-react'
 
 export const views = [
   { id: 'library', label: 'Library', icon: Library },
@@ -6,6 +6,7 @@ export const views = [
   { id: 'queue', label: 'Reading queue', icon: List },
   { id: 'collections', label: 'Collections', icon: Layers2 },
   { id: 'notes', label: 'Notes', icon: NotebookPen },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ] as const
 
 export type ViewId = (typeof views)[number]['id']
