@@ -1,4 +1,5 @@
 import type { ImportResult, LibraryItem } from '../shared/types/library'
+import type { SearchHit, SearchRequest } from '../shared/types/search'
 
 export interface OpenedPdf {
   path: string
@@ -12,6 +13,7 @@ export interface SkimApi {
     open: (paperId: string) => Promise<OpenedPdf | null>
   }
   importDialog: () => Promise<ImportResult[]>
+  search: (req: SearchRequest) => Promise<SearchHit[]>
   onOpen: (cb: (paperId: string) => void) => void
   pathsFor: (files: File[]) => string[]
 }

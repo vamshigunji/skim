@@ -2,6 +2,8 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { openDb } from './db'
 import { importPdfs, listLibrary, openPaper } from './services/library'
+import { searchExact } from './services/search'
+import type { SearchRequest } from '../shared/types/search'
 
 if (process.env.SKIM_USER_DATA) app.setPath('userData', process.env.SKIM_USER_DATA)
 
@@ -11,6 +13,7 @@ app.whenReady().then(() => {
   ipcMain.handle('library.list', () => listLibrary(db))
   ipcMain.handle('library.import', (_e, paths: string[]) => importPdfs(db, paths))
   ipcMain.handle('library.open', (_e, id: string) => openPaper(db, id))
+  ipcMain.handle('search.exact', (_e, req: SearchRequest) => searchExact(db, req))
   ipcMain.handle('import-dialog', async () => {
     const r = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'], filters: [{ name: 'PDF', extensions: ['pdf'] }] })
     return r.canceled ? [] : importPdfs(db, r.filePaths)

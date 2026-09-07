@@ -17,6 +17,7 @@ export const smartViews = ['To read', 'Skimming', 'Cited']
 export const keys = {
   palette: { combo: '⌘K', label: 'commands' },
   open: { combo: '⌘O', label: 'open PDF' },
+  find: { combo: '⌘F', label: 'find' },
   help: { combo: '?', label: 'shortcuts' },
   close: { combo: 'Esc', label: 'close' },
 }

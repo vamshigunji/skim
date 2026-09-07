@@ -1,24 +1,32 @@
 import { useEffect, useRef, useState } from 'react'
-import { labelsFor, parseGoto } from './labels'
+import { labelsFor, parseGoto } from '../../shared/labels'
 import { loadPdf, type PdfDoc } from './pdf'
 import { loadPosition, savePosition } from './position'
+import type { SearchHit, SearchOptions } from '../../shared/types/search'
 
 interface Props {
   path: string
   data: Uint8Array
+  initialPage?: number
 }
 
 const ZOOM_STEP = 1.25
 
-export function Reader({ path, data }: Props) {
+export function Reader({ path, data, initialPage }: Props) {
   const saved = loadPosition(path)
   const [doc, setDoc] = useState<PdfDoc | null>(null)
-  const [page, setPage] = useState(saved?.page ?? 0)
+  const [page, setPage] = useState(initialPage ?? saved?.page ?? 0)
   const [zoom, setZoom] = useState(saved?.zoom ?? 1)
   const [offset, setOffset] = useState(saved?.offset)
-  const [tab, setTab] = useState<'pages' | 'outline'>('pages')
+  const [tab, setTab] = useState<'pages' | 'outline' | 'search'>('pages')
   const [toast, setToast] = useState<string | null>(null)
   const [goto, setGoto] = useState('')
+  const [find, setFind] = useState('')
+  const [opts, setOpts] = useState<SearchOptions>({})
+  const [hits, setHits] = useState<SearchHit[]>([])
+  const [cur, setCur] = useState(0)
+  const [searched, setSearched] = useState('')
+  const findRef = useRef<HTMLInputElement>(null)
   const pages = useRef<(HTMLDivElement | null)[]>([])
   const scroller = useRef<HTMLDivElement>(null)
 
@@ -46,7 +54,32 @@ export function Reader({ path, data }: Props) {
   }, [doc])
 
   useEffect(() => {
+    if (initialPage !== undefined) jump(initialPage)
+  }, [initialPage])
+
+  const runFind = (dir: 1 | -1 = 1) => {
+    if (find !== searched || !hits.length) {
+      window.skim?.search({ query: find, options: opts, path }).then((h) => {
+        setHits(h)
+        setSearched(find)
+        setCur(0)
+        if (h[0]) jump(h[0].page_index)
+      })
+    } else {
+      const n = (cur + dir + hits.length) % hits.length
+      setCur(n)
+      jump(hits[n].page_index)
+    }
+  }
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey && e.key === 'f') {
+        setTab('search')
+        setTimeout(() => findRef.current?.focus())
+        e.preventDefault()
+        return
+      }
       if (e.target instanceof HTMLInputElement || e.metaKey) return
       if (e.key === ' ' || e.key === 'PageDown') jump(page + (e.shiftKey ? -1 : 1))
       else if (e.key === 'PageUp') jump(page - 1)
@@ -69,9 +102,9 @@ export function Reader({ path, data }: Props) {
 
   return (
     <div className="flex h-full min-h-0">
-      <aside className="flex w-[140px] shrink-0 flex-col border-r border-line bg-panel text-[9px]">
+      <aside className={`flex ${tab === 'search' ? 'w-[260px]' : 'w-[140px]'} shrink-0 flex-col border-r border-line bg-panel text-[9px]`}>
         <div className="flex gap-1 p-2">
-          {(['pages', 'outline'] as const).map((t) => (
+          {(['pages', 'outline', 'search'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -104,6 +137,59 @@ export function Reader({ path, data }: Props) {
             ) : (
               <p className="py-2 text-muted">No outline</p>
             ))}
+          {tab === 'search' && (
+            <div className="flex flex-col gap-2 py-1 text-[11px]">
+              <input
+                ref={findRef}
+                value={find}
+                placeholder="Find in document"
+                onChange={(e) => setFind(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && runFind(e.shiftKey ? -1 : 1)}
+                className="w-full rounded bg-raised px-2 py-1.5 placeholder:text-muted"
+              />
+              <div className="flex items-center gap-1">
+                {(
+                  [
+                    ['Aa', 'caseSensitive', 'Match case'],
+                    ['W', 'wholeWord', 'Whole word'],
+                    ['.*', 'regex', 'Regex'],
+                  ] as const
+                ).map(([txt, key, name]) => (
+                  <button
+                    key={key}
+                    aria-label={name}
+                    aria-pressed={!!opts[key]}
+                    onClick={() => {
+                      setOpts({ ...opts, [key]: !opts[key] })
+                      setSearched('')
+                    }}
+                    className={`rounded px-1.5 py-0.5 font-bold ${opts[key] ? 'bg-active text-accent' : 'text-muted'}`}
+                  >
+                    {txt}
+                  </button>
+                ))}
+                <span data-testid="hit-count" className="ml-auto text-muted">
+                  {hits.length ? `${cur + 1} / ${hits.length}` : searched ? '0 / 0' : ''}
+                </span>
+              </div>
+              {hits.map((h, k) => (
+                <button
+                  key={k}
+                  onClick={() => {
+                    setCur(k)
+                    jump(h.page_index)
+                  }}
+                  className={`truncate rounded px-1 py-1 text-left ${k === cur ? 'bg-active text-text' : 'text-text-2'}`}
+                >
+                  <span className="mr-2 font-semibold text-accent">p. {h.label}</span>
+                  {h.before}
+                  <mark className="bg-amber/40 text-text">{h.match}</mark>
+                  {h.after}
+                </button>
+              ))}
+              <p className="text-muted">ENTER next     SHIFT+ENTER previous</p>
+            </div>
+          )}
         </div>
         {!doc.labels && (
           <label className="flex items-center gap-1 border-t border-line p-2 text-muted">

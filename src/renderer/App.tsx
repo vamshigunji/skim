@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { OpenedPdf } from '../preload/api'
 import type { ImportResult, LibraryItem } from '../shared/types/library'
+import type { SearchHit } from '../shared/types/search'
 import { CommandPalette } from './CommandPalette'
 import { Library } from './library/Library'
 import { keys, smartViews, views, type ViewId } from './nav'
@@ -13,12 +14,15 @@ export function App() {
   const [palette, setPalette] = useState<'commands' | 'help' | null>(null)
   const [doc, setDoc] = useState<OpenedPdf | null>(null)
   const [items, setItems] = useState<LibraryItem[]>([])
+  const [results, setResults] = useState<SearchHit[] | null>(null)
+  const [openAt, setOpenAt] = useState<number | undefined>()
 
   const refresh = () => window.skim?.library.list().then(setItems)
-  const openPaper = (id: string) =>
+  const openPaper = (id: string, pageIndex?: number) =>
     window.skim?.library.open(id).then((d) => {
       if (!d) return
       setDoc(d)
+      setOpenAt(pageIndex)
       setView('reading')
     })
   const imported = (r: ImportResult[]) => {
@@ -28,7 +32,7 @@ export function App() {
 
   useEffect(() => {
     refresh()
-    window.skim?.onOpen(openPaper)
+    window.skim?.onOpen((id) => openPaper(id))
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === 'k') setPalette('commands')
       else if (e.metaKey && e.key === 'o') window.skim?.importDialog().then(imported)
@@ -83,12 +87,14 @@ export function App() {
 
         <main className="relative min-w-0 flex-1">
           {view === 'reading' && doc ? (
-            <Reader key={doc.path} path={doc.path} data={doc.data} />
+            <Reader key={doc.path} path={doc.path} data={doc.data} initialPage={openAt} />
           ) : view === 'library' || view === 'queue' ? (
             <Library
               items={view === 'queue' ? items.filter((i) => i.reading_status === 'to_read' || i.reading_status === 'skimming') : items}
+              results={results}
               onOpen={openPaper}
               onImport={() => window.skim?.importDialog().then(imported)}
+              onSearch={(q) => (q ? window.skim?.search({ query: q, options: {} }).then(setResults) : setResults(null))}
             />
           ) : (
             <div className="p-8">

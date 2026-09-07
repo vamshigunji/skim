@@ -1,9 +1,13 @@
+import { useState } from 'react'
 import type { LibraryItem } from '../../shared/types/library'
+import type { SearchHit } from '../../shared/types/search'
 
 interface Props {
   items: LibraryItem[]
-  onOpen: (paperId: string) => void
+  results: SearchHit[] | null
+  onOpen: (paperId: string, pageIndex?: number) => void
   onImport: () => void
+  onSearch: (query: string) => void
 }
 
 // Plain-language reasons for the status panel. Requirement 8 in features/06.
@@ -20,18 +24,48 @@ const stageLabels: [string, LibraryItem['stage']][] = [
   ['Failed', 'failed'],
 ]
 
-export function Library({ items, onOpen, onImport }: Props) {
+export function Library({ items, results, onOpen, onImport, onSearch }: Props) {
+  const [query, setQuery] = useState('')
   const notReady = items.filter((i) => i.stage && i.stage !== 'ready')
+  const byPaper = new Map<string, SearchHit[]>()
+  for (const h of results ?? []) byPaper.set(h.paper_id, [...(byPaper.get(h.paper_id) ?? []), h])
+
   return (
     <div className="flex h-full flex-col gap-6 p-8 text-[11px]">
       <div className="flex items-center gap-4">
-        <h1 className="font-reading text-[28px] font-semibold">Library</h1>
-        <button onClick={onImport} className="ml-auto rounded bg-accent px-4 py-2 text-[10px] font-bold text-bg">
+        <input
+          value={query}
+          placeholder="Search papers…"
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onSearch(query)}
+          className="min-w-0 flex-1 rounded bg-raised px-4 py-3 text-[13px] placeholder:text-muted"
+        />
+        <button onClick={onImport} className="rounded bg-accent px-4 py-2 text-[10px] font-bold text-bg">
           IMPORT PDFs +
         </button>
       </div>
 
-      {items.length === 0 ? (
+      {results ? (
+        <div data-testid="search-results" className="min-h-0 flex-1 overflow-y-auto">
+          <p className="mb-2 font-semibold text-muted">
+            EXACT SEARCH / {results.length} HITS IN {byPaper.size} PAPERS
+          </p>
+          {results.length === 0 && <p className="text-text-2">No matches. Exact search only; check spelling or try a shorter query.</p>}
+          {[...byPaper].map(([paperId, hits]) => (
+            <section key={paperId} className="mb-4">
+              <h2 className="font-reading text-sm font-semibold text-text">{hits[0].title}</h2>
+              {hits.map((h, k) => (
+                <button key={k} onClick={() => onOpen(paperId, h.page_index)} className="block w-full truncate py-1 text-left text-text-2 hover:text-text">
+                  <span className="mr-3 font-semibold text-accent">p. {h.label}</span>
+                  {h.before}
+                  <mark className="bg-amber/40 text-text">{h.match}</mark>
+                  {h.after}
+                </button>
+              ))}
+            </section>
+          ))}
+        </div>
+      ) : items.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded border border-dashed border-line bg-panel">
           <p className="font-reading text-lg text-text">Drop PDFs here</p>
           <p className="text-text-2">or choose files from your computer</p>
@@ -66,7 +100,7 @@ export function Library({ items, onOpen, onImport }: Props) {
             {stageLabels.map(([label, stage]) => (
               <span key={stage} className="flex justify-between text-muted">
                 {label}
-                <span className={`font-bold ${stage === 'ready' ? 'text-accent' : stage === 'skipped' ? 'text-amber' : stage === 'failed' ? 'text-red' : ''}`}>
+                <span className={`font-bold ${stage === 'ready' ? 'text-accent' : stage === 'skipped' ? 'text-amber' : 'text-red'}`}>
                   {items.filter((i) => i.stage === stage).length}
                 </span>
               </span>

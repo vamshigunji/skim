@@ -9,6 +9,7 @@ const api: SkimApi = {
     open: (id) => ipcRenderer.invoke('library.open', id),
   },
   importDialog: () => ipcRenderer.invoke('import-dialog'),
+  search: (req) => ipcRenderer.invoke('search.exact', req),
   onOpen: (cb) => ipcRenderer.on('open-paper', (_e, id: string) => cb(id)),
   pathsFor: (files) => files.map((f) => webUtils.getPathForFile(f)),
 }
