@@ -44,6 +44,4 @@ Playwright specs run against fixtures in `e2e/fixtures` and a fake provider serv
 
 ## License
 
-Source-available, not open source. You may use and modify Skim for your own
-personal or internal purposes. Redistribution in any form is not permitted
-without written permission. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
