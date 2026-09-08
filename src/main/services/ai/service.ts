@@ -32,8 +32,26 @@ export function createAiService(db: DatabaseSync, keychain: Keychain, send: (cha
     return { text }
   }
 
+  // Embeddings go through the same gates as chat: AI on, key present, egress confirmed. Throws so retrieval can fall back to exact-only with the reason.
+  // Provider for a request, with the gates every call shares: AI on, key present. Egress confirmation is checked by the caller.
+  const pick = (providerId?: string) => {
+    if (!enabled()) throw new Error('AI is off. Turn it on in Settings to ask questions.')
+    const cfg = rows().find((r) => (providerId ? r.id === providerId : r.is_default)) ?? rows()[0]
+    const p = createProvider(cfg, keychain.get(cfg.id))
+    if (!p.local && !keychain.has(cfg.id)) throw new Error(`No API key saved for ${cfg.id}. Add one in Settings.`)
+    return { cfg, p }
+  }
+  const embed = async (texts: string[]) => {
+    const { cfg, p } = pick()
+    if (!confirmed(cfg)) throw new Error(`${cfg.id} needs egress confirmation in Settings`)
+    const vectors = await p.embed(texts)
+    recordUsage(db, { provider: cfg.id, model: p.embedModel ?? '', purpose: 'embed', input: texts.reduce((n, t) => n + Math.ceil(t.length / 4), 0), output: 0 })
+    return { model: `${cfg.id}/${p.embedModel}`, vectors }
+  }
+
   const service = {
     complete,
+    embed,
     enabled,
     setEnabled: (on: boolean) => setSetting('ai.enabled', on),
     confirmEgress: (id: string) => setSetting(`egress.${id}`, true),
@@ -59,10 +77,7 @@ export function createAiService(db: DatabaseSync, keychain: Keychain, send: (cha
       ),
 
     async ask(req: AskRequest, onDelta?: (d: ChatDelta) => void): Promise<AskResult> {
-      if (!enabled()) throw new Error('AI is off. Turn it on in Settings to ask questions.')
-      const cfg = rows().find((r) => (req.providerId ? r.id === req.providerId : r.is_default)) ?? rows()[0]
-      const p = createProvider(cfg, keychain.get(cfg.id))
-      if (!p.local && !keychain.has(cfg.id)) throw new Error(`No API key saved for ${cfg.id}. Add one in Settings.`)
+      const { cfg, p } = pick(req.providerId)
       if (!confirmed(cfg)) return { needsConfirmation: true, providerId: cfg.id, sends: EGRESS_SENDS }
       const ac = new AbortController()
       running.set(req.requestId, ac)

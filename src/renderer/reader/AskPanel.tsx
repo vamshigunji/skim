@@ -9,7 +9,7 @@ interface Props {
   selection: string | null
   onAsk: (question: string) => void
   onStop: () => void
-  onJump: (pageIndex: number, quote: string) => void
+  onJump: (pageIndex: number, quote: string, paperId: string) => void
   onFind: (text: string) => void
 }
 
@@ -56,8 +56,8 @@ function Answer({ m, label, onJump, onFind }: { m: AskMessage; label: Props['lab
   const chip = (c: Citation | undefined, raw: string, i: number) => {
     if (!c) return <span key={i}>{raw}</span>
     return c.verified ? (
-      <button key={i} data-testid="citation-chip" title={c.quote} onClick={() => onJump(c.pageIndex, c.quote)} className="mx-0.5 rounded bg-active px-1 font-ui text-[10px] font-bold text-accent">
-        p. {label(c.pageIndex)}
+      <button key={i} data-testid="citation-chip" title={c.quote} onClick={() => onJump(c.pageIndex, c.quote, c.paperId)} className="mx-0.5 rounded bg-active px-1 font-ui text-[10px] font-bold text-accent">
+        {m.coverage ? `${c.paper}, p. ${c.pageLabel ?? `#${c.pageIndex + 1}`}` : `p. ${label(c.pageIndex)}`}
       </button>
     ) : (
       <button key={i} data-testid="citation-chip" aria-label="Find exact text" title={`Quote not found in source: “${c.quote}”. Click to search for it.`} onClick={() => onFind(c.quote)} className="mx-0.5 rounded bg-active px-1 font-ui text-[10px] font-bold text-amber">
@@ -80,6 +80,11 @@ function Answer({ m, label, onJump, onFind }: { m: AskMessage; label: Props['lab
             <button onClick={() => onFind(m.content.replace(/^NOT_FOUND\s*/, ''))} className="text-accent">
               Search exact text instead
             </button>
+          )}
+          {m.coverage && (
+            <span data-testid="coverage" className="block">
+              Searched {m.coverage.searched} paper{m.coverage.searched === 1 ? '' : 's'} · {m.coverage.contributed} contributed passages · {m.coverage.skipped} skipped (not indexed) · semantic retrieval {m.coverage.semantic}
+            </span>
           )}
         </p>
       )}

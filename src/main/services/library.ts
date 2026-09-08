@@ -66,6 +66,9 @@ export async function importPdfs(db: DatabaseSync, paths: string[]): Promise<Imp
     if (status.stage === 'ready' && p) {
       const ins = db.prepare('INSERT INTO pages (attachment_id, page_index, text, width_pt, height_pt) VALUES (?,?,?,?,?)')
       p.pages.forEach((pg, i) => ins.run(attachmentId, i, pg.text, pg.width, pg.height))
+      // ponytail: one chunk per page. Split by section when pages prove too coarse for retrieval.
+      const chunk = db.prepare('INSERT INTO chunks (id, attachment_id, ordinal, page_start, page_end, char_start, char_end, text) VALUES (?,?,?,?,?,?,?,?)')
+      p.pages.forEach((pg, i) => chunk.run(randomUUID(), attachmentId, i, i, i, 0, pg.text.length, pg.text))
       insertReferences(db, paperId, attachmentId, extractReferences(p.pages.map((x) => x.text)), extractRegions(p.pages))
     }
     db.prepare('INSERT INTO index_status (attachment_id, stage, skip_reason, error, attempts, extractor, updated_at) VALUES (?,?,?,?,1,?,?)').run(

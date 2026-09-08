@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { AskDelta } from '../../../shared/types/ai'
+import type { AskDelta, Citation } from '../../../shared/types/ai'
 import { openDb } from '../../db'
 import { importPdfs } from '../library'
 import { askGrounded, buildPassages, listThread } from './ask'
@@ -63,9 +63,10 @@ describe('askGrounded', () => {
     const deltas = await run(db, ai, 'How is attention computed?')
     expect(text(deltas)).toContain('scaled dot products')
     const cites = deltas.filter((d) => d.type === 'citation').map((d) => (d as { citation: unknown }).citation)
+    const key = db.prepare('SELECT citekey FROM papers').get()?.citekey as string
     expect(cites).toEqual([
-      { n: 1, pageIndex: 1, quote: 'Scaled dot-product attention', verified: true },
-      { n: 2, pageIndex: 1, quote: 'this quote does not exist', verified: false },
+      { n: 1, pageIndex: 1, quote: 'Scaled dot-product attention', verified: true, paperId: expect.any(String), paper: key, pageLabel: '1173' },
+      { n: 2, pageIndex: 1, quote: 'this quote does not exist', verified: false, paperId: expect.any(String), paper: key, pageLabel: '1173' },
     ])
     expect(deltas.find((d) => d.type === 'state')).toEqual({ type: 'state', state: 'PARTIAL', verified: 1, total: 2 })
     const thread = listThread(db, fixture)
@@ -88,5 +89,21 @@ describe('askGrounded', () => {
     expect(fake.calls.length).toBe(before)
     expect(deltas.find((d) => d.type === 'state')).toMatchObject({ state: 'NOT_FOUND' })
     expect(text(deltas)).toMatch(/does not appear to contain/)
+  })
+  it('answers across papers with hybrid retrieval, paper-labeled citations, a coverage footer, and a library thread', async () => {
+    const { db, ai } = await setup('cross-model')
+    await importPdfs(db, [resolve('e2e/fixtures/cited.pdf')])
+    const deltas: AskDelta[] = []
+    await new Promise<void>((done) => askGrounded(db, ai, { requestId: 'x1', paperIds: [], question: 'scaled dot-product attention' }, (d) => (deltas.push(d), (d.type === 'done' || d.type === 'error') && done())))
+    const cite = (deltas.find((d) => d.type === 'citation') as { citation: Citation }).citation
+    expect(cite).toMatchObject({ verified: true, pageIndex: 1, pageLabel: '1173', paper: expect.stringMatching(/^[a-z0-9]+$/) })
+    expect(deltas.find((d) => d.type === 'coverage')).toEqual({ type: 'coverage', coverage: { searched: 2, contributed: 2, skipped: 0, semantic: 'on' } })
+    expect(deltas.find((d) => d.type === 'state')).toMatchObject({ state: 'VERIFIED' })
+    expect(fake.calls.at(-1)?.body).toMatchObject({ messages: [{ role: 'system' }, { role: 'user', content: expect.stringContaining('| paper:') }] })
+    const thread = listThread(db)
+    expect(thread.map((m) => m.role)).toEqual(['user', 'assistant'])
+    expect(thread[0].scope).toEqual([])
+    expect(thread[1]).toMatchObject({ coverage: { searched: 2 }, state: 'VERIFIED', citations: [{ paper: cite.paper, pageLabel: '1173', paperId: cite.paperId }] })
+    expect(listThread(db, fixture)).toEqual([])
   })
 })

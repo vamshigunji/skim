@@ -61,12 +61,24 @@ export interface Citation {
   pageIndex: number
   quote: string
   verified: boolean
+  paperId: string
+  paper: string // citekey, shown on cross-paper chips
+  pageLabel: string | null
+}
+
+// Cross-paper coverage footer (features/06 requirement 11).
+export interface Coverage {
+  searched: number
+  contributed: number
+  skipped: number // in scope but not indexed
+  semantic: string // 'on' or the reason it was off
 }
 
 export type AskDelta =
   | ChatDelta
   | { type: 'citation'; citation: Citation }
   | { type: 'state'; state: AnswerState; verified: number; total: number }
+  | { type: 'coverage'; coverage: Coverage }
 
 export interface AskMessage {
   id: string
@@ -74,11 +86,14 @@ export interface AskMessage {
   content: string // raw model output; anchors are [[c:n "quote"]], NOT_FOUND prefix marks a refusal
   citations: Citation[]
   state?: AnswerState
+  coverage?: Coverage
+  scope?: string[] // paper ids of a cross-paper question
 }
 
 export interface GroundedAsk {
   requestId: string
-  path: string
+  path?: string // one open paper
+  paperIds?: string[] // cross-paper scope; empty means the whole library
   question: string
   selection?: string | null
 }

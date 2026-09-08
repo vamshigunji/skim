@@ -116,7 +116,7 @@ describe('migrations', () => {
     const dir = mkdtempSync(join(tmpdir(), 'skim-'))
     const path = join(dir, 'library.db')
     const v1 = openDb(path)
-    v1.exec('DROP TABLE ai_usage; DROP TABLE skim_overlays; ALTER TABLE proposals DROP COLUMN model; ALTER TABLE proposal_items DROP COLUMN slot; ALTER TABLE proposal_items DROP COLUMN confidence; ALTER TABLE proposal_items DROP COLUMN evidence; UPDATE schema_version SET version = 1')
+    v1.exec('DROP TABLE ai_usage; DROP TABLE skim_overlays; ALTER TABLE proposals DROP COLUMN model; ALTER TABLE proposal_items DROP COLUMN slot; ALTER TABLE proposal_items DROP COLUMN confidence; ALTER TABLE proposal_items DROP COLUMN evidence; ALTER TABLE chat_messages DROP COLUMN meta_json; UPDATE schema_version SET version = 1')
     v1.close()
     const db = openDb(path)
     expect(existsSync(`${path}.bak-1`)).toBe(true)

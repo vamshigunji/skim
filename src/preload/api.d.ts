@@ -50,7 +50,7 @@ export interface SkimApi {
     confirmEgress: (id: string) => Promise<void>
     ask: (req: AskRequest, onDelta: (d: ChatDelta) => void) => Promise<AskResult>
     askGrounded: (req: GroundedAsk, onDelta: (d: AskDelta) => void) => Promise<AskResult>
-    thread: (path: string) => Promise<AskMessage[]>
+    thread: (path?: string) => Promise<AskMessage[]>
     skim: (req: { requestId: string; path: string }) => Promise<SkimItem[] | Extract<AskResult, { needsConfirmation: true }>>
     skimList: (path: string) => Promise<SkimItem[]>
     propose: (req: { requestId: string; paperId: string }) => Promise<{ proposalId: string | null } | Extract<AskResult, { needsConfirmation: true }>>

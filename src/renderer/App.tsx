@@ -102,6 +102,7 @@ export function App() {
 
   useEffect(() => {
     if (view === 'notes') window.skim?.notes.list().then(setNotes)
+    else if (view === 'library' || view === 'queue') refresh()
   }, [view])
   const active = views.find((v) => v.id === view)!
   const onDrop = (e: React.DragEvent) => {

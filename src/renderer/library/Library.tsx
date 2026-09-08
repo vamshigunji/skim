@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import type { LibraryItem } from '../../shared/types/library'
 import type { SearchHit } from '../../shared/types/search'
+import { toggle } from '../reader/AnnotationsPanel'
+import { LibraryAsk } from './LibraryAsk'
 
 interface Props {
   items: LibraryItem[]
@@ -28,6 +30,8 @@ const stageLabels: [string, LibraryItem['stage']][] = [
 
 export function Library({ items, results, onOpen, onImport, onSearch, onPropose, banner }: Props) {
   const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState<string[]>([])
+  const [asking, setAsking] = useState(false)
   const notReady = items.filter((i) => i.stage && i.stage !== 'ready')
   const byPaper = new Map<string, SearchHit[]>()
   for (const h of results ?? []) byPaper.set(h.paper_id, [...(byPaper.get(h.paper_id) ?? []), h])
@@ -42,6 +46,9 @@ export function Library({ items, results, onOpen, onImport, onSearch, onPropose,
           onKeyDown={(e) => e.key === 'Enter' && onSearch(query)}
           className="min-w-0 flex-1 rounded bg-raised px-4 py-3 text-[13px] placeholder:text-muted"
         />
+        <button onClick={() => setAsking(true)} className="rounded bg-active px-4 py-2 text-[10px] font-bold text-accent">
+          ASK {selected.length ? `${selected.length} PAPERS` : 'LIBRARY'}
+        </button>
         <button onClick={onImport} className="rounded bg-accent px-4 py-2 text-[10px] font-bold text-bg">
           IMPORT PDFs +
         </button>
@@ -83,6 +90,7 @@ export function Library({ items, results, onOpen, onImport, onSearch, onPropose,
             <li className="mb-2 font-semibold text-muted">READING QUEUE / {String(items.length).padStart(2, '0')} PAPERS</li>
             {items.map((i) => (
               <li key={i.paper_id} data-testid="paper-row" className="flex items-center gap-2 border-b border-line">
+                <input type="checkbox" aria-label={`Select ${i.title}`} checked={selected.includes(i.paper_id)} onChange={() => setSelected(toggle(selected, i.paper_id))} />
                 <button onClick={() => onOpen(i.paper_id)} className="flex min-w-0 flex-1 items-center gap-4 py-4 text-left">
                   <span className="min-w-0 flex-1 truncate font-reading text-sm font-semibold text-text">
                     {i.title}
@@ -102,6 +110,7 @@ export function Library({ items, results, onOpen, onImport, onSearch, onPropose,
             ))}
           </ul>
 
+          {asking && <LibraryAsk paperIds={selected} total={items.length} onOpen={onOpen} onClose={() => setAsking(false)} onFind={onSearch} />}
           <aside data-testid="index-status" className="flex w-[320px] shrink-0 flex-col gap-3 rounded bg-panel p-5">
             <span className="font-semibold text-muted">INDEX STATUS</span>
             <span className="text-[34px] font-bold text-text">{items.filter((i) => i.stage === 'ready').length}</span>

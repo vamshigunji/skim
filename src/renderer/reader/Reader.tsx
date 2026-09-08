@@ -5,13 +5,13 @@ import { labelsFor, parseGoto } from '../../shared/labels'
 import type { Annotation } from '../../shared/types/db'
 import type { SearchHit, SearchOptions } from '../../shared/types/search'
 import type { ReferenceView, RegionView } from '../../shared/types/references'
-import type { AskMessage } from '../../shared/types/ai'
 import { DENSITY, pickOverlays, SKIM_LABELS, type SkimItem, type SkimLabel } from '../../shared/skim'
 import { AnnotationLayer } from './AnnotationLayer'
 import { HoverCard, type Target } from './HoverCard'
 import { markMentions } from './mentions'
 import { AnnotationsPanel, isShown, toggle, type Filter } from './AnnotationsPanel'
 import { AskPanel } from './AskPanel'
+import { useAsk } from './useAsk'
 import { findQuoteRange } from './locate'
 import { createHistory } from './history'
 import { loadPdf, renderTextLayer, type PdfDoc } from './pdf'
@@ -61,11 +61,9 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
   const [regions, setRegions] = useState<RegionView[]>([])
   const [card, setCard] = useState<{ target: Target; x: number; y: number } | null>(null)
   const [side, setSide] = useState<'marks' | 'ask'>('marks')
-  const [messages, setMessages] = useState<AskMessage[]>([])
-  const [live, setLive] = useState<AskMessage | null>(null)
+  const { messages, live, ask, stop } = useAsk({ path })
   const [attached, setAttached] = useState<string | null>(null)
   const [flash, setFlash] = useState<{ page: number; rects: FracRect[] } | null>(null)
-  const asking = useRef<string | null>(null)
   const [skim, setSkim] = useState(false)
   const [skimItems, setSkimItems] = useState<SkimItem[]>([])
   const [skimRects, setSkimRects] = useState<Record<string, FracRect[]>>({})
@@ -85,7 +83,6 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
     window.skim?.annotations.list(path).then(setAnnots)
     window.skim?.references(path).then(setRefs)
     window.skim?.regions(path).then(setRegions)
-    window.skim?.ai.thread(path).then(setMessages)
   }, [data, path])
 
   useEffect(() => {
@@ -207,44 +204,6 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
     return a.id
   }
 
-  // Grounded Ask. The live answer is built from deltas in the same shape as a stored message, so one renderer handles both.
-  const ask = (question: string) => {
-    const requestId = crypto.randomUUID()
-    const msg: AskMessage = { id: requestId, role: 'assistant', content: '', citations: [] }
-    const selection = attached
-    setAttached(null)
-    setMessages((m) => [...m, { id: `${requestId}-q`, role: 'user', content: question, citations: [] }])
-    setLive({ ...msg })
-    asking.current = requestId
-    const end = () => {
-      asking.current = null
-      setLive(null)
-      window.skim?.ai.thread(path).then(setMessages)
-    }
-    window.skim?.ai
-      .askGrounded({ requestId, path, question, selection }, (d) => {
-        if (d.type === 'text') msg.content += d.text
-        else if (d.type === 'citation') {
-          msg.citations = [...msg.citations, d.citation]
-          msg.content += `[[c:${d.citation.n} "${d.citation.quote}"]]`
-        } else if (d.type === 'state') msg.state = d.state
-        else if (d.type === 'error') msg.content += `\n[${d.message}]`
-        setLive({ ...msg })
-        if (d.type === 'done' || d.type === 'error') end()
-      })
-      .then((r) => {
-        if ('needsConfirmation' in r) {
-          msg.content = `[${r.providerId} is a hosted provider. Confirm once in Settings what gets sent, then ask again.]`
-          setLive({ ...msg })
-          asking.current = null
-        }
-      })
-      .catch((e: Error) => {
-        msg.content = `[${e.message}]`
-        setLive({ ...msg })
-        asking.current = null
-      })
-  }
   // Page-fraction rects for a verified quote, located in the text layer. Null when the layer has not rendered or the quote is broken by hyphenation.
   const locate = (i: number, quote: string) => {
     const pageEl = pages.current[i]
@@ -638,7 +597,19 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
           ))}
         </div>
         {side === 'ask' ? (
-          <AskPanel messages={messages} live={live} label={label} selection={attached} onAsk={ask} onStop={() => asking.current && window.skim?.ai.cancel(asking.current)} onJump={jumpQuote} onFind={findExact} />
+          <AskPanel
+            messages={messages}
+            live={live}
+            label={label}
+            selection={attached}
+            onAsk={(q) => {
+              ask(q, attached)
+              setAttached(null)
+            }}
+            onStop={stop}
+            onJump={jumpQuote}
+            onFind={findExact}
+          />
         ) : (
           <>
             <div className="flex items-center gap-2">

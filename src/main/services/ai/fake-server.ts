@@ -15,6 +15,10 @@ export function startFakeServer() {
         res.write(s)
         if (slow) await new Promise((r) => setTimeout(r, 300))
       }
+      // Letter-frequency vectors: deterministic, and similar texts land close together.
+      const embed = (t: string) => Array.from({ length: 26 }, (_, i) => (t.toLowerCase().match(new RegExp(String.fromCharCode(97 + i), 'g')) ?? []).length)
+      if (req.url === '/api/embed') return res.end(JSON.stringify({ embeddings: (body.input as string[]).map(embed) }))
+      if (req.url === '/v1/embeddings') return res.end(JSON.stringify({ data: (body.input as string[]).map((t) => ({ embedding: embed(t) })) }))
       if (req.url === '/api/tags') return res.end(JSON.stringify({ models: [{ name: 'llama3.2:latest' }, { name: 'nomic-embed-text' }] }))
       if (req.url === '/v1/models') return res.end(JSON.stringify({ data: [{ id: 'fake-model' }] }))
       if (req.url === '/api/chat') {
@@ -26,6 +30,7 @@ export function startFakeServer() {
         res.writeHead(200, { 'content-type': 'text/event-stream' })
         const answers: Record<string, string> = {
           'grounded-model': 'Attention comes from scaled dot products [[c:2 "Scaled dot-product attention"]]. It also claims [[c:2 "this quote does not exist"]].',
+          'cross-model': 'Attention is computed from scaled dot products [[c:1 "Scaled dot-product attention"]].',
           'notfound-model': 'NOT_FOUND The passages do not mention a sample size.',
           'propose-model':
             '[{"op":"set_field","field":"title","after":"Attention Is All You Need","confidence":0.9,"reason":"The first page heading reads Attention Is All You Need"},{"op":"add_tag","tag":"transformers","confidence":0.6,"reason":"Describes multi-head attention"},{"op":"delete_paper","confidence":1}]',

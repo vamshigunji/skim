@@ -16,8 +16,8 @@ const messages = [
     role: 'assistant' as const,
     content: 'From scaled dot products [[c:1 "Scaled dot-product attention"]]. Also [[c:2 "this quote does not exist"]].',
     citations: [
-      { n: 1, pageIndex: 1, quote: 'Scaled dot-product attention', verified: true },
-      { n: 2, pageIndex: 1, quote: 'this quote does not exist', verified: false },
+      { n: 1, pageIndex: 1, quote: 'Scaled dot-product attention', verified: true, paperId: 'p1', paper: 'attention2017', pageLabel: '1173' },
+      { n: 2, pageIndex: 1, quote: 'this quote does not exist', verified: false, paperId: 'p1', paper: 'attention2017', pageLabel: '1173' },
     ],
     state: 'PARTIAL' as const,
   },
@@ -41,9 +41,17 @@ describe('AskPanel', () => {
   it('jumps to the passage on a verified chip and offers exact search on an unverified one', async () => {
     const chips = host.querySelectorAll('[data-testid="citation-chip"]')
     await click(chips[0])
-    expect(onJump).toHaveBeenCalledWith(1, 'Scaled dot-product attention')
+    expect(onJump).toHaveBeenCalledWith(1, 'Scaled dot-product attention', 'p1')
     await click(host.querySelector('button[aria-label="Find exact text"]')!)
     expect(onFind).toHaveBeenCalledWith('this quote does not exist')
+  })
+  it('names the paper on cross-paper chips and shows the coverage footer', async () => {
+    const cross = [{ ...messages[1], id: 'm3', coverage: { searched: 3, contributed: 2, skipped: 1, semantic: 'on' } }]
+    document.body.innerHTML = ''
+    host = document.body.appendChild(document.createElement('div'))
+    await act(async () => createRoot(host).render(<AskPanel messages={cross} live={null} label={String} onAsk={onAsk} onStop={() => {}} onJump={onJump} onFind={onFind} selection={null} />))
+    expect(host.querySelector('[data-testid="citation-chip"]')?.textContent).toBe('attention2017, p. 1173')
+    expect(host.querySelector('[data-testid="coverage"]')?.textContent).toBe('Searched 3 papers · 2 contributed passages · 1 skipped (not indexed) · semantic retrieval on')
   })
   it('sends a question on Enter', async () => {
     const input = host.querySelector<HTMLTextAreaElement>('textarea')!

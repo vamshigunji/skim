@@ -30,7 +30,7 @@ app.whenReady().then(() => {
   ipcMain.handle('ai.confirmEgress', (_e, id: string) => ai.confirmEgress(id))
   ipcMain.handle('ai.ask', (_e, req: AskRequest) => ai.ask(req))
   ipcMain.handle('ai.askGrounded', (_e, req: GroundedAsk) => askGrounded(db, ai, req, (d) => broadcast(`ai.stream:${req.requestId}`, d)))
-  ipcMain.handle('ai.thread', (_e, path: string) => listThread(db, path))
+  ipcMain.handle('ai.thread', (_e, path?: string) => listThread(db, path))
   ipcMain.handle('ai.skim', (_e, req: { requestId: string; path: string }) => runSkim(db, ai, req))
   ipcMain.handle('ai.skimList', (_e, path: string) => listSkim(db, path))
   ipcMain.handle('ai.propose', (_e, req: { requestId: string; paperId: string }) => proposeEdits(db, ai, req))
