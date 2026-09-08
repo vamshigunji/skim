@@ -41,3 +41,9 @@ Playwright specs run against fixtures in `e2e/fixtures` and a fake provider serv
 - `src/renderer` React UI: library, reader, notes, settings.
 - `src/shared` pure logic used on both sides: verification, anchors, citations, export, proposals.
 - `e2e` Playwright specs driving the built app, with PDF fixtures.
+
+## License
+
+Source-available, not open source. You may use and modify Skim for your own
+personal or internal purposes. Redistribution in any form is not permitted
+without written permission. See [LICENSE](LICENSE).

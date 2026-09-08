@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "AI-native PDF reader for researchers",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE",
   "main": "out/main/index.js",
   "type": "module",
   "scripts": {
