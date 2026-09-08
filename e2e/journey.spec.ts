@@ -7,7 +7,7 @@ import { startFakeServer } from '../src/main/services/ai/fake-server'
 const fixture = resolve('e2e/fixtures/sample.pdf')
 
 // The whole promise in one session (README, PRD): import, read, highlight, ask, verify the source, export.
-// The model server is on 127.0.0.1, standing in for the default local Ollama, so nothing leaves the machine.
+// Runs on the default local provider against a 127.0.0.1 stand-in for Ollama: no API key, no egress dialog, nothing leaves the machine.
 test('import a PDF, read it, highlight a passage, ask a question, click the citation to land on the source, export a note with a citekey', async () => {
   const fake = await startFakeServer()
   const userData = mkdtempSync(join(tmpdir(), 'skim-e2e-'))
@@ -30,16 +30,14 @@ test('import a PDF, read it, highlight a passage, ask a question, click the cita
   await word.dblclick({ position: { x: box.width - 6, y: box.height / 2 } })
   await expect(page.locator('[data-annotation-id]')).toHaveCount(1)
 
-  // Point the local-only provider at the stand-in server.
+  // The default local provider, pointed at the stand-in for Ollama: no API key, and no egress dialog because nothing leaves the machine.
   await page.getByRole('button', { name: 'Settings' }).click()
-  await page.getByLabel('openai base URL').fill(fake.url)
-  await page.getByLabel('openai model').fill('grounded-model')
-  await page.getByLabel('openai API key').fill('sk-e2e')
-  await page.getByRole('button', { name: 'Save openai key' }).click()
-  await page.getByRole('button', { name: 'Make openai default' }).click()
-  await page.getByRole('button', { name: 'Test openai' }).click()
-  await page.getByRole('button', { name: 'Confirm' }).click()
+  await page.getByLabel('ollama base URL').fill(fake.url)
+  await page.getByLabel('ollama model').fill('grounded-model')
+  await page.getByRole('button', { name: 'Test ollama' }).click()
   await expect(page.getByTestId('test-output')).toContainText('scaled dot products')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.locator('header')).toContainText('OLLAMA · grounded-model')
 
   // Ask, then click the citation to land on the highlighted source passage.
   await page.getByRole('button', { name: 'Reading', exact: true }).click()

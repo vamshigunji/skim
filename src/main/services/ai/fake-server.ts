@@ -19,26 +19,27 @@ export function startFakeServer() {
       const embed = (t: string) => Array.from({ length: 26 }, (_, i) => (t.toLowerCase().match(new RegExp(String.fromCharCode(97 + i), 'g')) ?? []).length)
       if (req.url === '/api/embed') return res.end(JSON.stringify({ embeddings: (body.input as string[]).map(embed) }))
       if (req.url === '/v1/embeddings') return res.end(JSON.stringify({ data: (body.input as string[]).map((t) => ({ embedding: embed(t) })) }))
+      // Scripted replies by model name, shared by every wire format so the local Ollama path answers like the hosted ones.
+      const answers: Record<string, string> = {
+        'grounded-model': 'Attention comes from scaled dot products [[c:2 "Scaled dot-product attention"]]. It also claims [[c:2 "this quote does not exist"]].',
+        'cross-model': 'Attention is computed from scaled dot products [[c:1 "Scaled dot-product attention"]].',
+        'notfound-model': 'NOT_FOUND The passages do not mention a sample size.',
+        'propose-model':
+          '[{"op":"set_field","field":"title","after":"Attention Is All You Need","confidence":0.9,"reason":"The first page heading reads Attention Is All You Need"},{"op":"add_tag","tag":"transformers","confidence":0.6,"reason":"Describes multi-head attention"},{"op":"delete_paper","confidence":1}]',
+        'skim-model':
+          'Here: [{"label":"method","quote":"Scaled dot-product attention","confidence":0.9},{"label":"result","quote":"Multi-head attention","confidence":0.8},{"label":"goal","quote":"a made up sentence","confidence":0.99}]',
+      }
+      const words = (model: string): string[] => (answers[model] ? answers[model].match(/.{1,13}/g)! : ['Hello', ' from', ' fake'])
       if (req.url === '/api/tags') return res.end(JSON.stringify({ models: [{ name: 'llama3.2:latest' }, { name: 'nomic-embed-text' }] }))
       if (req.url === '/v1/models') return res.end(JSON.stringify({ data: [{ id: 'fake-model' }] }))
       if (req.url === '/api/chat') {
         res.writeHead(200, { 'content-type': 'application/x-ndjson' })
-        for (const w of ['Hello', ' from', ' fake']) await chunk(JSON.stringify({ message: { content: w }, done: false }) + '\n')
+        for (const w of words(body?.model)) await chunk(JSON.stringify({ message: { content: w }, done: false }) + '\n')
         return res.end(JSON.stringify({ message: { content: '' }, done: true, prompt_eval_count: 5, eval_count: 3 }) + '\n')
       }
       if (req.url === '/v1/chat/completions') {
         res.writeHead(200, { 'content-type': 'text/event-stream' })
-        const answers: Record<string, string> = {
-          'grounded-model': 'Attention comes from scaled dot products [[c:2 "Scaled dot-product attention"]]. It also claims [[c:2 "this quote does not exist"]].',
-          'cross-model': 'Attention is computed from scaled dot products [[c:1 "Scaled dot-product attention"]].',
-          'notfound-model': 'NOT_FOUND The passages do not mention a sample size.',
-          'propose-model':
-            '[{"op":"set_field","field":"title","after":"Attention Is All You Need","confidence":0.9,"reason":"The first page heading reads Attention Is All You Need"},{"op":"add_tag","tag":"transformers","confidence":0.6,"reason":"Describes multi-head attention"},{"op":"delete_paper","confidence":1}]',
-          'skim-model':
-            'Here: [{"label":"method","quote":"Scaled dot-product attention","confidence":0.9},{"label":"result","quote":"Multi-head attention","confidence":0.8},{"label":"goal","quote":"a made up sentence","confidence":0.99}]',
-        }
-        const words = answers[body?.model] ? answers[body.model].match(/.{1,13}/g)! : ['Hello', ' from', ' fake']
-        for (const w of words) await chunk(`data: ${JSON.stringify({ choices: [{ delta: { content: w } }] })}\n\n`)
+        for (const w of words(body?.model)) await chunk(`data: ${JSON.stringify({ choices: [{ delta: { content: w } }] })}\n\n`)
         await chunk(`data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 5, completion_tokens: 3 } })}\n\n`)
         return res.end('data: [DONE]\n\n')
       }
