@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { LibraryItem } from '../../shared/types/library'
 import type { SearchHit } from '../../shared/types/search'
 
@@ -8,6 +8,8 @@ interface Props {
   onOpen: (paperId: string, pageIndex?: number) => void
   onImport: () => void
   onSearch: (query: string) => void
+  onPropose: (paperId: string) => void
+  banner?: ReactNode
 }
 
 // Plain-language reasons for the status panel. Requirement 8 in features/06.
@@ -24,7 +26,7 @@ const stageLabels: [string, LibraryItem['stage']][] = [
   ['Failed', 'failed'],
 ]
 
-export function Library({ items, results, onOpen, onImport, onSearch }: Props) {
+export function Library({ items, results, onOpen, onImport, onSearch, onPropose, banner }: Props) {
   const [query, setQuery] = useState('')
   const notReady = items.filter((i) => i.stage && i.stage !== 'ready')
   const byPaper = new Map<string, SearchHit[]>()
@@ -45,6 +47,7 @@ export function Library({ items, results, onOpen, onImport, onSearch }: Props) {
         </button>
       </div>
 
+      {banner}
       {results ? (
         <div data-testid="search-results" className="min-h-0 flex-1 overflow-y-auto">
           <p className="mb-2 font-semibold text-muted">
@@ -79,15 +82,21 @@ export function Library({ items, results, onOpen, onImport, onSearch }: Props) {
           <ul className="min-w-0 flex-1 overflow-y-auto">
             <li className="mb-2 font-semibold text-muted">READING QUEUE / {String(items.length).padStart(2, '0')} PAPERS</li>
             {items.map((i) => (
-              <li key={i.paper_id} className="border-b border-line">
-                <button onClick={() => onOpen(i.paper_id)} className="flex w-full items-center gap-4 py-4 text-left">
-                  <span className="min-w-0 flex-1 truncate font-reading text-sm font-semibold text-text">{i.title}</span>
+              <li key={i.paper_id} data-testid="paper-row" className="flex items-center gap-2 border-b border-line">
+                <button onClick={() => onOpen(i.paper_id)} className="flex min-w-0 flex-1 items-center gap-4 py-4 text-left">
+                  <span className="min-w-0 flex-1 truncate font-reading text-sm font-semibold text-text">
+                    {i.title}
+                    {i.tags && <span className="ml-2 font-ui text-[10px] font-normal text-accent">{i.tags}</span>}
+                  </span>
                   <span className="text-muted">
                     {i.year ?? '—'} · {i.page_count ?? '?'} pp
                   </span>
                   <span className={`w-20 text-right font-semibold ${i.reading_status === 'to_read' ? 'text-amber' : 'text-accent'}`}>
                     {i.reading_status.replace('_', ' ').toUpperCase()}
                   </span>
+                </button>
+                <button aria-label={`Suggest fixes for ${i.title}`} onClick={() => onPropose(i.paper_id)} className="shrink-0 rounded px-2 py-1 text-[10px] font-bold text-muted hover:text-accent">
+                  AI FIX
                 </button>
               </li>
             ))}

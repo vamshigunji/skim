@@ -6,8 +6,8 @@ import type { SearchHit } from '../../shared/types/search'
 import { Library } from './Library'
 
 const items: LibraryItem[] = [
-  { paper_id: 'p1', title: 'Scaling laws', year: 2020, reading_status: 'skimming', page_count: 21, stage: 'ready', skip_reason: null, error: null, path: '/a.pdf', page_labels_json: null, updated_at: 2 },
-  { paper_id: 'p2', title: 'Old scan', year: null, reading_status: 'to_read', page_count: 7, stage: 'skipped', skip_reason: 'no_text_layer', error: null, path: '/b.pdf', page_labels_json: null, updated_at: 1 },
+  { paper_id: 'p1', title: 'Scaling laws', year: 2020, reading_status: 'skimming', page_count: 21, stage: 'ready', skip_reason: null, error: null, path: '/a.pdf', page_labels_json: null, updated_at: 2, tags: null },
+  { paper_id: 'p2', title: 'Old scan', year: null, reading_status: 'to_read', page_count: 7, stage: 'skipped', skip_reason: 'no_text_layer', error: null, path: '/b.pdf', page_labels_json: null, updated_at: 1, tags: null },
 ]
 
 const hits: SearchHit[] = [
@@ -21,7 +21,7 @@ const onImport = vi.fn()
 const onSearch = vi.fn()
 
 const render = (props: Partial<Parameters<typeof Library>[0]> = {}) =>
-  act(async () => createRoot(host).render(<Library items={items} results={null} onOpen={onOpen} onImport={onImport} onSearch={onSearch} {...props} />))
+  act(async () => createRoot(host).render(<Library items={items} results={null} onOpen={onOpen} onImport={onImport} onSearch={onSearch} onPropose={() => {}} {...props} />))
 
 const type = async (input: HTMLInputElement, value: string) => {
   const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!

@@ -80,7 +80,8 @@ export async function importPdfs(db: DatabaseSync, paths: string[]): Promise<Imp
 export const listLibrary = (db: DatabaseSync) =>
   db
     .prepare(
-      `SELECT p.id paper_id, p.title, p.year, p.reading_status, p.updated_at, a.path, a.page_count, a.page_labels_json, s.stage, s.skip_reason, s.error
+      `SELECT p.id paper_id, p.title, p.year, p.reading_status, p.updated_at, a.path, a.page_count, a.page_labels_json, s.stage, s.skip_reason, s.error,
+         (SELECT group_concat(t.name, ', ') FROM paper_tags pt JOIN tags t ON t.id = pt.tag_id WHERE pt.paper_id = p.id) tags
        FROM papers p LEFT JOIN attachments a ON a.paper_id = p.id LEFT JOIN index_status s ON s.attachment_id = a.id
        ORDER BY p.updated_at DESC`,
     )

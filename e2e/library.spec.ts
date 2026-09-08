@@ -18,7 +18,7 @@ test('imports on open, lists the paper with index status, persists across relaun
   page = await app.firstWindow()
   await expect(page.getByText('Front matter')).toBeVisible()
   await expect(page.getByTestId('index-status')).toContainText('Ready')
-  await page.getByRole('button', { name: /Front matter/ }).click()
+  await page.getByTestId('paper-row').getByRole('button').first().click()
   await expect(page.getByTestId('page-counter')).toHaveText('P. i / 3')
   await app.close()
 })

@@ -6,6 +6,8 @@ import type { ProviderStatus, UsageSummary } from '../shared/types/ai'
 import { Settings } from './settings/Settings'
 import { CommandPalette } from './CommandPalette'
 import { Library } from './library/Library'
+import { Proposals } from './library/Proposals'
+import type { ProposalView } from '../shared/proposals'
 import { Notes } from './notes/Notes'
 import type { NoteView } from '../shared/export'
 import { keys, smartViews, views, type ViewId } from './nav'
@@ -26,6 +28,9 @@ export function App() {
   const [testOutput, setTestOutput] = useState('')
   const [notes, setNotes] = useState<NoteView[]>([])
   const [receipt, setReceipt] = useState('')
+  const [proposals, setProposals] = useState<ProposalView[]>([])
+  const [proposalNote, setProposalNote] = useState('')
+  const [conflict, setConflict] = useState<string | null>(null)
 
   const loadAi = () => {
     window.skim?.ai.providers().then(setProviders)
@@ -47,7 +52,27 @@ export function App() {
   const defaultProvider = providers.find((p) => p.is_default)
   const modelLabel = !aiOn ? 'AI OFF' : defaultProvider ? `${defaultProvider.kind.toUpperCase()} · ${defaultProvider.model ?? (defaultProvider.local ? 'LOCAL' : 'no model')}` : 'OLLAMA · LOCAL'
 
-  const refresh = () => window.skim?.library.list().then(setItems)
+  const refresh = () => {
+    window.skim?.library.list().then(setItems)
+    window.skim?.proposals.list().then(setProposals)
+  }
+  // AI proposals: the model suggests, the user approves, and every applied change can be undone (features/10 requirements 9 and 10).
+  const propose = (paperId: string) => {
+    setProposalNote('Asking the model for suggestions…')
+    window.skim?.ai
+      .propose({ requestId: crypto.randomUUID(), paperId })
+      .then((r) => {
+        setProposalNote('needsConfirmation' in r ? `${r.providerId} is a hosted provider. Confirm once in Settings what gets sent.` : r.proposalId ? '' : 'No suggestions. The record already matches the first pages.')
+        refresh()
+      })
+      .catch((e: Error) => setProposalNote(e.message))
+  }
+  const undo = (id: string, force?: boolean) =>
+    window.skim?.proposals.undo(id, force).then((r) => {
+      setConflict(r.conflicts.length ? id : null)
+      setProposalNote(r.conflicts.length ? `Kept the current value of ${r.conflicts.map((c) => c.slot).join(', ')}: it changed after this was applied.` : `Undone ${r.undone} change${r.undone === 1 ? '' : 's'}.`)
+      refresh()
+    })
   const openPaper = (id: string, pageIndex?: number) =>
     window.skim?.library.open(id).then((d) => {
       if (!d) return
@@ -152,6 +177,23 @@ export function App() {
               onOpen={openPaper}
               onImport={() => window.skim?.importDialog().then(imported)}
               onSearch={(q) => (q ? window.skim?.search({ query: q, options: {} }).then(setResults) : setResults(null))}
+              onPropose={propose}
+              banner={
+                <Proposals
+                  proposals={proposals}
+                  note={proposalNote}
+                  conflict={conflict}
+                  onApply={(id, ids) =>
+                    window.skim?.proposals.apply(id, ids).then((r) => {
+                      setProposalNote(`Applied ${r.applied}${r.stale ? `, skipped ${r.stale} stale` : ''}. Undo is below.`)
+                      refresh()
+                    })
+                  }
+                  onReject={(id) => window.skim?.proposals.reject(id).then(refresh)}
+                  onUndo={undo}
+                  onDismiss={() => setConflict(null)}
+                />
+              }
             />
           ) : (
             <div className="p-8">

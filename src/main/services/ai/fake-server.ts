@@ -27,6 +27,8 @@ export function startFakeServer() {
         const answers: Record<string, string> = {
           'grounded-model': 'Attention comes from scaled dot products [[c:2 "Scaled dot-product attention"]]. It also claims [[c:2 "this quote does not exist"]].',
           'notfound-model': 'NOT_FOUND The passages do not mention a sample size.',
+          'propose-model':
+            '[{"op":"set_field","field":"title","after":"Attention Is All You Need","confidence":0.9,"reason":"The first page heading reads Attention Is All You Need"},{"op":"add_tag","tag":"transformers","confidence":0.6,"reason":"Describes multi-head attention"},{"op":"delete_paper","confidence":1}]',
           'skim-model':
             'Here: [{"label":"method","quote":"Scaled dot-product attention","confidence":0.9},{"label":"result","quote":"Multi-head attention","confidence":0.8},{"label":"goal","quote":"a made up sentence","confidence":0.99}]',
         }

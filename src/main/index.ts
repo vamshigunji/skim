@@ -10,6 +10,8 @@ import { createKeychain } from './services/ai/keys'
 import { createAiService } from './services/ai/service'
 import { askGrounded, listThread } from './services/ai/ask'
 import { listSkim, runSkim } from './services/ai/skim'
+import { proposeEdits } from './services/ai/propose'
+import { applyProposal, listProposals, rejectProposal, undoProposal } from './services/proposals'
 import type { AskDelta, AskRequest, GroundedAsk, ProviderConfig } from '../shared/types/ai'
 import type { AnnotationInput } from '../shared/annot'
 import type { SearchRequest } from '../shared/types/search'
@@ -31,6 +33,11 @@ app.whenReady().then(() => {
   ipcMain.handle('ai.thread', (_e, path: string) => listThread(db, path))
   ipcMain.handle('ai.skim', (_e, req: { requestId: string; path: string }) => runSkim(db, ai, req))
   ipcMain.handle('ai.skimList', (_e, path: string) => listSkim(db, path))
+  ipcMain.handle('ai.propose', (_e, req: { requestId: string; paperId: string }) => proposeEdits(db, ai, req))
+  ipcMain.handle('proposals.list', () => listProposals(db))
+  ipcMain.handle('proposals.apply', (_e, id: string, itemIds: string[], force?: boolean) => applyProposal(db, id, itemIds, force))
+  ipcMain.handle('proposals.reject', (_e, id: string) => rejectProposal(db, id))
+  ipcMain.handle('proposals.undo', (_e, id: string, force?: boolean) => undoProposal(db, id, force))
   ipcMain.handle('ai.cancel', (_e, id: string) => ai.cancel(id))
   ipcMain.handle('ai.usage', () => ai.usage())
 

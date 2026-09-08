@@ -13,6 +13,7 @@ export interface LibraryItem {
   stage: IndexStatus['stage'] | null
   skip_reason: IndexStatus['skip_reason']
   error: string | null
+  tags: string | null // comma-joined tag names
 }
 
 export interface ImportResult {

@@ -34,7 +34,7 @@ export interface AskRequest {
   requestId: string
   providerId?: string
   messages: ChatMessage[]
-  purpose: 'ask' | 'summary' | 'skim' | 'test'
+  purpose: 'ask' | 'summary' | 'skim' | 'propose' | 'test'
 }
 
 export type AskResult = { requestId: string } | { needsConfirmation: true; providerId: string; sends: string[] }

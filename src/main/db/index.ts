@@ -3,9 +3,10 @@ import { DatabaseSync } from 'node:sqlite'
 import init from './migrations/0001_init.sql?raw'
 import aiUsage from './migrations/0002_ai_usage.sql?raw'
 import skim from './migrations/0003_skim_overlays.sql?raw'
+import evidence from './migrations/0004_proposal_evidence.sql?raw'
 
 // Numbered migrations applied in order. Append only; never edit a shipped entry.
-const migrations = [init, aiUsage, skim]
+const migrations = [init, aiUsage, skim, evidence]
 export const SCHEMA_VERSION = migrations.length
 
 export function openDb(path: string): DatabaseSync {

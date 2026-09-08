@@ -36,8 +36,8 @@ const seed = (db: DatabaseSync) => {
     INSERT INTO chunks VALUES ('c1','a1',0,0,0,0,10,'scaled dot product attention','3.2',5);
     INSERT INTO index_status VALUES ('a1','ready',0,NULL,NULL,1,'pdfjs',0);
     INSERT INTO chat_threads VALUES ('t1','p1',NULL,'q',0);
-    INSERT INTO proposals VALUES ('pr1','t1',NULL,'tag','add tag','applied',0);
-    INSERT INTO proposal_items VALUES ('pi1','pr1','papers','p1','add_tag','null','"x"','applied');
+    INSERT INTO proposals (id, thread_id, message_id, kind, summary, status, created_at) VALUES ('pr1','t1',NULL,'tag','add tag','applied',0);
+    INSERT INTO proposal_items (id, proposal_id, target_table, target_id, op, before_json, after_json, status) VALUES ('pi1','pr1','papers','p1','add_tag','null','"x"','applied');
     INSERT INTO edit_journal VALUES ('j1','pi1',0,NULL,'null','"x"');
   `)
 }
@@ -116,7 +116,7 @@ describe('migrations', () => {
     const dir = mkdtempSync(join(tmpdir(), 'skim-'))
     const path = join(dir, 'library.db')
     const v1 = openDb(path)
-    v1.exec('DROP TABLE ai_usage; DROP TABLE skim_overlays; UPDATE schema_version SET version = 1')
+    v1.exec('DROP TABLE ai_usage; DROP TABLE skim_overlays; ALTER TABLE proposals DROP COLUMN model; ALTER TABLE proposal_items DROP COLUMN slot; ALTER TABLE proposal_items DROP COLUMN confidence; ALTER TABLE proposal_items DROP COLUMN evidence; UPDATE schema_version SET version = 1')
     v1.close()
     const db = openDb(path)
     expect(existsSync(`${path}.bak-1`)).toBe(true)

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { DENSITY, parseSkim, type SkimItem } from '../../../shared/skim'
-import type { AskResult, ChatDelta } from '../../../shared/types/ai'
+import type { AskResult } from '../../../shared/types/ai'
 import { verifyQuote, type PageText } from '../../../shared/verify'
 import type { createAiService } from './service'
 
@@ -31,16 +31,9 @@ export async function runSkim(db: DatabaseSync, ai: ReturnType<typeof createAiSe
   const pages = db.prepare('SELECT page_index AS "index", text FROM pages WHERE attachment_id = ? ORDER BY page_index').all(att.id) as unknown as PageText[]
   const body = pages.map((p) => `[[p:${p.index + 1}]]\n${p.text}`).join('\n\n').slice(0, 60_000) // ponytail: front of the paper when it does not fit; retrieve by section when a long paper needs it
 
-  let text = ''
-  let settle: { resolve: () => void; reject: (e: Error) => void }
-  const finished = new Promise<void>((resolve, reject) => (settle = { resolve, reject }))
-  const r = await ai.ask({ requestId, purpose: 'skim', messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: body }] }, (d: ChatDelta) => {
-    if (d.type === 'text') text += d.text
-    else if (d.type === 'done') settle.resolve()
-    else if (d.type === 'error') settle.reject(new Error(d.message))
-  })
+  const r = await ai.complete({ requestId, purpose: 'skim', messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: body }] })
   if ('needsConfirmation' in r) return r
-  await finished
+  const { text } = r
 
   const model = modelKey(db)
   const now = Date.now()

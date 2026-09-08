@@ -17,7 +17,23 @@ export function createAiService(db: DatabaseSync, keychain: Keychain, send: (cha
   const enabled = () => setting('ai.enabled') ?? true
   const confirmed = (cfg: ProviderConfig) => cfg.kind === 'ollama' || !!setting(`egress.${cfg.id}`)
 
-  return {
+  // Whole reply as one string, for JSON-shaped requests (skim labels, edit proposals). Rejects on provider error.
+  const complete = async (req: AskRequest): Promise<{ text: string } | Extract<AskResult, { needsConfirmation: true }>> => {
+    let text = ''
+    let settle!: { resolve: () => void; reject: (e: Error) => void }
+    const finished = new Promise<void>((resolve, reject) => (settle = { resolve, reject }))
+    const r = await service.ask(req, (d) => {
+      if (d.type === 'text') text += d.text
+      else if (d.type === 'done') settle.resolve()
+      else if (d.type === 'error') settle.reject(new Error(d.message))
+    })
+    if ('needsConfirmation' in r) return r
+    await finished
+    return { text }
+  }
+
+  const service = {
+    complete,
     enabled,
     setEnabled: (on: boolean) => setSetting('ai.enabled', on),
     confirmEgress: (id: string) => setSetting(`egress.${id}`, true),
@@ -69,4 +85,5 @@ export function createAiService(db: DatabaseSync, keychain: Keychain, send: (cha
       return { requestId: req.requestId }
     },
   }
+  return service
 }
