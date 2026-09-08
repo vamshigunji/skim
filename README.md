@@ -40,4 +40,4 @@ Playwright specs run against fixtures in `e2e/fixtures` and a fake provider serv
 - `src/preload` the single `window.skim` bridge.
 - `src/renderer` React UI: library, reader, notes, settings.
 - `src/shared` pure logic used on both sides: verification, anchors, citations, export, proposals.
-- `docs` product and design specs. `design` visual system and prototype. `ralph` the build ledger.
+- `e2e` Playwright specs driving the built app, with PDF fixtures.

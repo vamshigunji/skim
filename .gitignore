@@ -9,3 +9,6 @@ playwright-report
 .claude/settings.local.json
 .codex
 .serena/
+
+# Specs, design system, and the build ledger stay local
+private/
