@@ -3,7 +3,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import { DENSITY, parseSkim, type SkimItem } from '../../../shared/skim'
 import type { AskResult } from '../../../shared/types/ai'
 import { verifyQuote, type PageText } from '../../../shared/verify'
-import type { createAiService } from './service'
+import { defaultProvider, type createAiService } from './service'
 
 const SYSTEM = `You skim one paper and pick its most important sentences. Passages start with [[p:N]].
 Reply with only a JSON array of objects {"label": "goal" | "method" | "result" | "limitation", "quote": "one sentence copied verbatim from a passage, 5 to 40 words", "confidence": 0 to 1}.
@@ -13,7 +13,7 @@ const attachment = (db: DatabaseSync, path: string) =>
   db.prepare('SELECT id FROM attachments WHERE path = ?').get(path) as { id: string } | undefined
 // Overlays belong to the model that produced them (design/04): a different default model sees none.
 const modelKey = (db: DatabaseSync) => {
-  const p = db.prepare('SELECT id, model FROM providers WHERE is_default = 1').get() as { id: string; model: string | null } | undefined
+  const p = defaultProvider(db)
   return `${p?.id ?? ''}/${p?.model ?? ''}`
 }
 

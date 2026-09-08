@@ -3,7 +3,7 @@ import { parseProposedEdits } from '../../../shared/proposals'
 import type { AskResult } from '../../../shared/types/ai'
 import type { Paper } from '../../../shared/types/db'
 import { createProposal } from '../proposals'
-import type { createAiService } from './service'
+import { defaultProvider, type createAiService } from './service'
 
 const SYSTEM = `You check one paper's library record against its first pages and suggest corrections.
 Reply with only a JSON array of {"op":"set_field","field":<title|authors_json|year|venue|doi|abstract>,"after":<value>,"confidence":0 to 1,"reason":"short reason quoting the page"} or {"op":"add_tag","tag":"lowercase topic","confidence":0 to 1,"reason":"..."}.
@@ -19,6 +19,6 @@ export async function proposeEdits(db: DatabaseSync, ai: ReturnType<typeof creat
   if ('needsConfirmation' in r) return r
   const items = parseProposedEdits(r.text, paperId).filter((it) => it.op !== 'set_field' || JSON.stringify(it.after) !== JSON.stringify(paper[it.slot as keyof Paper] ?? null)) // no diff, no item
   if (!items.length) return { proposalId: null }
-  const provider = db.prepare('SELECT id, model FROM providers WHERE is_default = 1').get() as { id: string; model: string | null } | undefined
+  const provider = defaultProvider(db)
   return { proposalId: createProposal(db, { origin: 'ai', title: `Suggested fixes for “${paper.title ?? paperId}”`, model: `${provider?.model ?? ''} on ${provider?.id ?? ''}`, items }) }
 }

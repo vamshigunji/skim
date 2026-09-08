@@ -6,7 +6,7 @@ import { answerState, type AskDelta, type AskMessage, type AskResult, type ChatD
 import { verifyQuote, type PageText } from '../../../shared/verify'
 import { paperWithCitekey } from '../notes'
 import { hybridRetrieve } from './retrieval'
-import type { createAiService } from './service'
+import { defaultProvider, type createAiService } from './service'
 
 // ponytail: chars, not tokens, and one budget for every provider. Read maxContext per provider when the providers table carries it.
 const CHAR_BUDGET = 60_000
@@ -76,7 +76,7 @@ export async function askGrounded(db: DatabaseSync, ai: ReturnType<typeof create
     passages = chunks.map((c, i) => ({ n: i + 1, pageIndex: c.page_start, text: c.text, att: ready.find((a) => a.id === c.attachment_id)! }))
     coverage = { searched: ready.length, contributed: new Set(chunks.map((c) => c.attachment_id)).size, skipped: scope.length - ready.length, semantic }
   }
-  const provider = db.prepare('SELECT id, model FROM providers WHERE is_default = 1').get() as { id: string; model: string | null } | undefined
+  const provider = defaultProvider(db)
 
   const parser = createAnchorParser()
   const citations: Citation[] = []

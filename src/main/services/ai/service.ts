@@ -4,6 +4,9 @@ import type { Keychain } from './keys'
 import { createProvider } from './provider'
 import { recordUsage, usageSummary } from './usage'
 
+// The provider a request uses when none is named.
+export const defaultProvider = (db: DatabaseSync) => db.prepare('SELECT id, model FROM providers WHERE is_default = 1').get() as { id: string; model: string | null } | undefined
+
 export function createAiService(db: DatabaseSync, keychain: Keychain, send: (channel: string, delta: ChatDelta) => void) {
   const setting = (key: string) => JSON.parse((db.prepare('SELECT value_json FROM settings WHERE key = ?').get(key)?.value_json as string | undefined) ?? 'null')
   const setSetting = (key: string, value: unknown) =>
