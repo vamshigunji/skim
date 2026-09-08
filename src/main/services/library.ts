@@ -2,34 +2,14 @@ import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
 import type { ImportResult, LibraryItem } from '../../shared/types/library'
+import { probe, type Extract, type Probe } from './extract'
 import { extractMetadata } from './metadata'
 import { extractReferences, extractRegions, insertReferences } from './references'
 
 const MAX_BYTES = 200 * 1024 * 1024
 
-async function probe(data: Buffer) {
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(data) }).promise
-  const pages: { text: string; width: number; height: number; items: { str: string; x: number; y: number; w: number; h: number }[] }[] = []
-  let titleGuess: { str: string; height: number } | null = null
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i)
-    const { width, height } = page.getViewport({ scale: 1 })
-    const items = (await page.getTextContent()).items.filter((it) => 'str' in it)
-    pages.push({
-      text: items.map((it) => it.str + (it.hasEOL ? '\n' : '')).join(''),
-      width,
-      height,
-      items: items.map((it) => ({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width, h: it.height })),
-    })
-    if (i === 1) for (const it of items) if (it.str.trim() && it.height > (titleGuess?.height ?? 0)) titleGuess = it
-  }
-  const { info } = await doc.getMetadata()
-  return { numPages: doc.numPages, labels: await doc.getPageLabels(), info: info as Record<string, unknown>, pages, titleGuess: titleGuess?.str.trim() ?? null }
-}
-
-export async function importPdfs(db: DatabaseSync, paths: string[]): Promise<ImportResult[]> {
+export async function importPdfs(db: DatabaseSync, paths: string[], extract: Extract = probe): Promise<ImportResult[]> {
   const results: ImportResult[] = []
   for (const path of paths) {
     const data = readFileSync(path)
@@ -44,12 +24,12 @@ export async function importPdfs(db: DatabaseSync, paths: string[]): Promise<Imp
     const now = Date.now()
     let title = basename(path, '.pdf')
     let meta: Partial<ReturnType<typeof extractMetadata>> = {}
-    let p: Awaited<ReturnType<typeof probe>> | null = null
+    let p: Probe | null = null
     let status: { stage: string; skip_reason: string | null; error: string | null } = { stage: 'ready', skip_reason: null, error: null }
     if (data.length > MAX_BYTES) status = { stage: 'skipped', skip_reason: 'too_large', error: null }
     else
       try {
-        p = await probe(data)
+        p = await extract(data)
         meta = extractMetadata({ pages: p.pages.slice(0, 2).map((x) => x.text), info: p.info, filename: path, titleGuess: p.titleGuess })
         title = meta.title!
         if (!p.pages.some((x) => x.text.trim())) status = { stage: 'skipped', skip_reason: 'no_text_layer', error: null }

@@ -67,7 +67,7 @@ export function Notes({ notes, receipt, onOpen, onExport, onCopy, paper }: Props
               </div>
               <ul>
                 {mine.map((n) => (
-                  <li key={n.id} data-testid="note" className="flex items-start gap-2 border-b border-line py-2">
+                  <li key={n.id} data-testid="note" className="flex items-start gap-2 border-b border-line py-2 [contain-intrinsic-size:auto_64px] [content-visibility:auto]">
                     <input type="checkbox" aria-label={`Select note ${n.text ?? n.id}`} checked={picked.includes(n.id)} onChange={() => setPicked(toggle(picked, n.id))} className="mt-1" />
                     <span className="mt-1 inline-block h-3 w-3 shrink-0 rounded-sm" style={{ background: n.color ?? undefined }} />
                     <button onClick={() => onOpen(n.paper_id, n.page_index)} className="min-w-0 flex-1 text-left">

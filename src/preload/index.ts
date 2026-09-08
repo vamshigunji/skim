@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { AskResult } from '../shared/types/ai'
+import type { ImportResult } from '../shared/types/library'
 import type { SkimApi } from './api'
 
 // Deltas for one request arrive on ai.stream:<requestId> until done or error.
@@ -48,6 +49,7 @@ const api: SkimApi = {
     reject: (id) => ipcRenderer.invoke('proposals.reject', id),
     undo: (id, force) => ipcRenderer.invoke('proposals.undo', id, force),
   },
+  onIndexStatus: (cb) => ipcRenderer.on('index.status', (_e, r: ImportResult) => cb(r)),
   onOpen: (cb) => ipcRenderer.on('open-paper', (_e, id: string) => cb(id)),
   references: (path) => ipcRenderer.invoke('references.list', path),
   regions: (path) => ipcRenderer.invoke('regions.list', path),

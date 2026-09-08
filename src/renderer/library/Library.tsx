@@ -89,7 +89,7 @@ export function Library({ items, results, onOpen, onImport, onSearch, onPropose,
           <ul className="min-w-0 flex-1 overflow-y-auto">
             <li className="mb-2 font-semibold text-muted">READING QUEUE / {String(items.length).padStart(2, '0')} PAPERS</li>
             {items.map((i) => (
-              <li key={i.paper_id} data-testid="paper-row" className="flex items-center gap-2 border-b border-line">
+              <li key={i.paper_id} data-testid="paper-row" className="flex items-center gap-2 border-b border-line [contain-intrinsic-size:auto_57px] [content-visibility:auto]">
                 <input type="checkbox" aria-label={`Select ${i.title}`} checked={selected.includes(i.paper_id)} onChange={() => setSelected(toggle(selected, i.paper_id))} />
                 <button onClick={() => onOpen(i.paper_id)} className="flex min-w-0 flex-1 items-center gap-4 py-4 text-left">
                   <span className="min-w-0 flex-1 truncate font-reading text-sm font-semibold text-text">

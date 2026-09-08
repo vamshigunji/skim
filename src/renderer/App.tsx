@@ -89,6 +89,7 @@ export function App() {
     refresh()
     loadAi()
     window.skim?.onOpen((id) => openPaper(id))
+    window.skim?.onIndexStatus(refresh)
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === 'k') setPalette('commands')
       else if (e.metaKey && e.key === 'o') window.skim?.importDialog().then(imported)

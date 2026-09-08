@@ -27,6 +27,7 @@ export interface SkimApi {
     delete: (id: string) => Promise<void>
   }
   onOpen: (cb: (paperId: string) => void) => void
+  onIndexStatus: (cb: (r: ImportResult) => void) => void
   proposals: {
     list: () => Promise<ProposalView[]>
     apply: (id: string, itemIds: string[], force?: boolean) => Promise<{ applied: number; stale: number }>

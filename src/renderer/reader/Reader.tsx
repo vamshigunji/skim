@@ -215,11 +215,11 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
     return toFractions([...range.getClientRects()], pageEl.getBoundingClientRect())
   }
   // Land on the cited page and flash the verified quote for 3 seconds (features/04 requirement 3).
-  const jumpQuote = (i: number, quote: string) => {
-    go(i)
+  const jumpQuote = (i: number, quote: string, tries = 20) => {
+    if (tries === 20) go(i)
     setTimeout(() => {
-      const rects = locate(i, quote)
-      if (!rects) return
+      const rects = locate(i, quote) // the page renders lazily, so poll until its text layer exists
+      if (!rects) return tries > 0 && jumpQuote(i, quote, tries - 1)
       setFlash({ page: i, rects })
       setTimeout(() => setFlash(null), 3000)
     }, 50)
@@ -607,7 +607,7 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
               setAttached(null)
             }}
             onStop={stop}
-            onJump={jumpQuote}
+            onJump={(i, q) => jumpQuote(i, q)}
             onFind={findExact}
           />
         ) : (
@@ -647,10 +647,21 @@ export function Reader({ path, data, initialPage, onOpenPaper }: Props) {
   )
 }
 
+// Renders only near the viewport (two screens each side) and releases the canvas when scrolled away; the placeholder keeps the scroll height exact (design/07).
 function PageCanvas({ doc, index, scale, text }: { doc: PdfDoc; index: number; scale: number; text?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const textRef = useRef<HTMLDivElement>(null)
+  const host = useRef<HTMLDivElement>(null)
+  const [near, setNear] = useState(false)
+  const size = doc.sizes[index]
   useEffect(() => {
+    // Root must be the page's own scroll container: an ancestor overflow clips the intersection, and pages and thumbnails scroll in different ones.
+    const io = new IntersectionObserver(([e]) => setNear(e.isIntersecting), { root: host.current!.closest('.overflow-auto, .overflow-y-auto'), rootMargin: '200% 0px' })
+    io.observe(host.current!)
+    return () => io.disconnect()
+  }, [])
+  useEffect(() => {
+    if (!near) return
     let cancelled = false
     doc.getPage(index).then((p) => {
       const canvas = ref.current
@@ -668,11 +679,11 @@ function PageCanvas({ doc, index, scale, text }: { doc: PdfDoc; index: number; s
     return () => {
       cancelled = true
     }
-  }, [doc, index, scale, text])
+  }, [doc, index, scale, text, near])
   return (
-    <div className="relative">
-      <canvas ref={ref} className="bg-paper" />
-      {text && <div ref={textRef} className="textLayer" />}
+    <div ref={host} className="relative bg-paper" style={{ width: size.width * scale, height: size.height * scale }}>
+      {near && <canvas ref={ref} className="bg-paper" />}
+      {near && text && <div ref={textRef} className="textLayer" />}
     </div>
   )
 }

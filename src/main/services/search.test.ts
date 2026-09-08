@@ -29,6 +29,12 @@ describe('searchExact', () => {
     expect(searchExact(db, { query: 'ead', options: { wholeWord: true } })).toHaveLength(0)
   })
 
+  it('matches substrings inside words and phrases across spaces', () => {
+    expect(searchExact(db, { query: 'ead att', options: {} })).toHaveLength(1)
+    expect(searchExact(db, { query: 'ATTENTION', options: {} })).toHaveLength(2)
+    expect(searchExact(db, { query: 'at', options: {} }).length).toBeGreaterThan(0)
+  })
+
   it('supports regex', () => {
     expect(searchExact(db, { query: 'Multi-?head', options: { regex: true } })).toHaveLength(1)
   })

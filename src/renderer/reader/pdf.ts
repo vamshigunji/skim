@@ -8,6 +8,7 @@ export interface PdfDoc {
   numPages: number
   labels: string[] | null
   outline: { title: string; pageIndex: number }[]
+  sizes: { width: number; height: number }[] // points, scale 1
   getPage: (index: number) => Promise<PDFPageProxy>
 }
 
@@ -25,7 +26,12 @@ export async function loadPdf(data: Uint8Array): Promise<PdfDoc> {
     const dest = typeof item.dest === 'string' ? await doc.getDestination(item.dest) : item.dest
     if (dest?.[0]) outline.push({ title: item.title, pageIndex: await doc.getPageIndex(dest[0]) })
   }
+  const sizes = await Promise.all(Array.from({ length: doc.numPages }, async (_, i) => {
+    const { width, height } = (await doc.getPage(i + 1)).getViewport({ scale: 1 })
+    return { width, height }
+  }))
   return {
+    sizes,
     numPages: doc.numPages,
     labels: await doc.getPageLabels(),
     outline,
